@@ -1,14 +1,38 @@
 import SwiftUI
 import Combine
 
-enum AppTab: String, CaseIterable, Identifiable {
-    case streams  = "音频流"
-    case matrix   = "路由矩阵"
-    case cables   = "虚拟线缆"
-    case monitor  = "监控诊断"
-    case settings = "设置与概览"
+enum AppLanguage: String, CaseIterable, Identifiable {
+    case chinese = "zh-Hans"
+    case english = "en"
 
     var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .chinese: return "简体中文"
+        case .english: return "English"
+        }
+    }
+}
+
+enum AppTab: String, CaseIterable, Identifiable {
+    case streams
+    case matrix
+    case cables
+    case monitor
+    case settings
+
+    var id: String { rawValue }
+
+    func title(for lang: AppLanguage) -> String {
+        switch self {
+        case .streams:  return lang == .chinese ? "音频流" : "Streams"
+        case .matrix:   return lang == .chinese ? "路由矩阵" : "Matrix"
+        case .cables:   return lang == .chinese ? "虚拟线缆" : "Cables"
+        case .monitor:  return lang == .chinese ? "监控诊断" : "Monitoring"
+        case .settings: return lang == .chinese ? "设置与概览" : "Settings"
+        }
+    }
 
     var icon: String {
         switch self {
@@ -23,6 +47,21 @@ enum AppTab: String, CaseIterable, Identifiable {
 
 final class AppModel: ObservableObject {
     @Published var activeTab: AppTab = .streams
+    @Published var language: AppLanguage = {
+        if let saved = UserDefaults.standard.string(forKey: "app_language"),
+           let lang = AppLanguage(rawValue: saved) {
+            return lang
+        }
+        return .chinese
+    }() {
+        didSet {
+            UserDefaults.standard.set(language.rawValue, forKey: "app_language")
+        }
+    }
+
+    func t(_ zh: String, _ en: String) -> String {
+        return language == .chinese ? zh : en
+    }
     @Published var metrics: VbanAppMetric = VbanAppMetric()
     @Published var cables: [VbanCableDesc] = []
     @Published var devices: [VbanAudioDevDesc] = []

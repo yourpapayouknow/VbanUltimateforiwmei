@@ -5,48 +5,50 @@ struct MonitoringView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 工具栏
+            // 工具栏 (固定高度 38)
             HStack(spacing: 8) {
-                Text("网络音频监控与指标诊断")
+                Text(model.t("网络音频监控与指标诊断", "Monitoring & Diagnostics"))
                     .font(Theme.cnText(12, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
+                    .help(model.t("实时遥测各音频流网络吞吐、微秒抖动、丢包与时钟漂移", "Real-time telemetry of network throughput, jitter, loss, and clock drift"))
 
                 Spacer()
 
-                ParamCapsule(text: "500ms 实时采样", color: Theme.amberWarn)
+                ParamCapsule(text: model.t("500ms 实时采样", "500ms Sampling"), color: Theme.amberWarn)
+                    .help(model.t("后台调度定时器每 500ms 刷新一次微秒级网络统计数据", "Background timer polls microsecond network stats every 500ms"))
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .frame(height: 38)
             .background(Color.white.opacity(0.03))
 
             Divider().background(Theme.borderSubtle)
 
-            // 表头
+            // 表头 (固定高度 28)
             HStack(spacing: 10) {
-                Text("状态")
+                Text(model.t("状态", "Status"))
                     .frame(width: 40, alignment: .center)
-                Text("流标识")
+                Text(model.t("流标识", "Stream ID"))
                     .frame(width: 140, alignment: .leading)
-                Text("有效带宽")
+                Text(model.t("有效带宽", "Bandwidth"))
                     .frame(width: 100, alignment: .trailing)
-                Text("网络包率")
+                Text(model.t("网络包率", "Packet Rate"))
                     .frame(width: 90, alignment: .trailing)
-                Text("累计音频帧")
+                Text(model.t("音频帧数", "Audio Frames"))
                     .frame(width: 110, alignment: .trailing)
-                Text("网络抖动")
+                Text(model.t("网络抖动", "Jitter"))
                     .frame(width: 80, alignment: .trailing)
-                Text("丢包计数")
+                Text(model.t("丢包计数", "Lost Pkts"))
                     .frame(width: 70, alignment: .trailing)
-                Text("重复包")
+                Text(model.t("重复包", "Duplicates"))
                     .frame(width: 60, alignment: .trailing)
-                Text("乱序包")
+                Text(model.t("乱序包", "Reordered"))
                     .frame(width: 60, alignment: .trailing)
                 Spacer()
             }
             .font(Theme.cnText(11, weight: .semibold))
             .foregroundColor(Theme.textTertiary)
             .padding(.horizontal, 16)
-            .padding(.vertical, 6)
+            .frame(height: 28)
             .background(Color.black.opacity(0.2))
 
             Divider().background(Theme.borderSubtle)
@@ -57,11 +59,12 @@ struct MonitoringView: View {
                     Image(systemName: "speedometer")
                         .font(.system(size: 28))
                         .foregroundColor(Theme.textTertiary)
-                    Text("无活动网络音频流指标。向本机发送音频流后将在此处实时刷新微秒级遥测数据。")
-                        .font(Theme.cnText(11))
+                    Text(model.t("无监控遥测数据", "No Telemetry Data"))
+                        .font(Theme.cnText(12))
                         .foregroundColor(Theme.textTertiary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .help(model.t("当存在活动网络音频流时，此处将实时展示各流的微秒级网络吞吐与丢包分析", "Active streams will display microsecond network throughput and loss telemetry here"))
             } else {
                 ScrollView {
                     VStack(spacing: 0) {
@@ -113,7 +116,7 @@ struct MonitoringView: View {
                                 Spacer()
                             }
                             .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
+                            .frame(height: 34)
                             .background(idx % 2 == 0 ? Color.clear : Theme.rowAltBg)
 
                             Divider().background(Theme.borderSubtle)

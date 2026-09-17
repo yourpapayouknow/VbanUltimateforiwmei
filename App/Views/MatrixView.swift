@@ -10,37 +10,38 @@ struct MatrixView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 工具栏操作条
+            // 工具栏操作条 (固定高度 38)
             HStack(spacing: 12) {
-                Text("矩阵交叉连接")
+                Text(model.t("路由矩阵", "Routing Matrix"))
                     .font(Theme.cnText(12, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
+                    .help(model.t("在物理声卡、虚拟音频线缆与 VBAN 网络流之间建立任意通道交汇", "Interconnect physical audio devices, virtual cables, and VBAN network streams"))
 
                 Spacer()
 
                 // 源信号端点下拉
                 Menu {
-                    Section("物理输入设备") {
+                    Section(model.t("物理输入设备", "Physical Inputs")) {
                         ForEach(model.devices.filter { $0.inChannels > 0 }, id: \.uid) { d in
-                            Button("麦克风: \(d.name)") {
+                            Button(d.name) {
                                 selectedSrcId = d.uid
                                 selectedSrcName = d.name
                             }
                         }
                     }
-                    Section("虚拟线缆输出") {
+                    Section(model.t("虚拟线缆输出", "Virtual Cable Outputs")) {
                         ForEach(model.cables, id: \.cableId) { c in
-                            Button("线缆输出: \(c.name)") {
+                            Button(c.name) {
                                 selectedSrcId = c.cableId
                                 selectedSrcName = c.name
                             }
                         }
                     }
-                    Section("网络接收流 (VBAN RX)") {
+                    Section(model.t("网络接收流", "Network Incoming Streams")) {
                         ForEach(model.metrics.rxStreams, id: \.name) { s in
-                            Button("网络流: \(s.name)") {
+                            Button(s.name) {
                                 selectedSrcId = s.name
-                                selectedSrcName = "VBAN RX [\(s.name)]"
+                                selectedSrcName = "VBAN [\(s.name)]"
                             }
                         }
                     }
@@ -48,12 +49,13 @@ struct MatrixView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.down.right.and.arrow.up.left")
                             .font(.system(size: 10))
-                        Text(selectedSrcName.isEmpty ? "选择输入源..." : selectedSrcName)
+                        Text(selectedSrcName.isEmpty ? model.t("选择输入源...", "Select Source...") : selectedSrcName)
                             .font(Theme.cnText(11))
                     }
                 }
                 .menuStyle(.borderedButton)
                 .frame(width: 170)
+                .help(model.t("选择信号输入源端点", "Select audio signal source endpoint"))
 
                 Image(systemName: "arrow.right")
                     .font(.system(size: 10, weight: .bold))
@@ -61,17 +63,17 @@ struct MatrixView: View {
 
                 // 目标端点下拉
                 Menu {
-                    Section("物理输出设备") {
+                    Section(model.t("物理输出设备", "Physical Outputs")) {
                         ForEach(model.devices.filter { $0.outChannels > 0 }, id: \.uid) { d in
-                            Button("扬声器: \(d.name)") {
+                            Button(d.name) {
                                 selectedDstId = d.uid
                                 selectedDstName = d.name
                             }
                         }
                     }
-                    Section("虚拟线缆输入") {
+                    Section(model.t("虚拟线缆输入", "Virtual Cable Inputs")) {
                         ForEach(model.cables, id: \.cableId) { c in
-                            Button("线缆输入: \(c.name)") {
+                            Button(c.name) {
                                 selectedDstId = c.cableId
                                 selectedDstName = c.name
                             }
@@ -81,12 +83,13 @@ struct MatrixView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.up.right.and.arrow.down.left")
                             .font(.system(size: 10))
-                        Text(selectedDstName.isEmpty ? "选择输出目标..." : selectedDstName)
+                        Text(selectedDstName.isEmpty ? model.t("选择输出目标...", "Select Destination...") : selectedDstName)
                             .font(Theme.cnText(11))
                     }
                 }
                 .menuStyle(.borderedButton)
                 .frame(width: 170)
+                .help(model.t("选择信号输出目标端点", "Select audio signal destination endpoint"))
 
                 Button(action: {
                     guard !selectedSrcId.isEmpty, !selectedDstId.isEmpty else { return }
@@ -97,41 +100,42 @@ struct MatrixView: View {
                     selectedDstId = ""
                     selectedDstName = ""
                 }) {
-                    Label("建立路由", systemImage: "link")
+                    Label(model.t("建立路由", "Connect"), systemImage: "link")
                         .font(Theme.cnText(11, weight: .medium))
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.neonCyan)
                 .disabled(selectedSrcId.isEmpty || selectedDstId.isEmpty)
+                .help(model.t("建立输入源到输出目标的交叉连接路由", "Establish cross-point route from source to destination"))
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .frame(height: 38)
             .background(Color.white.opacity(0.03))
 
             Divider().background(Theme.borderSubtle)
 
-            // 表头
+            // 表头 (固定高度 28)
             HStack(spacing: 12) {
-                Text("状态")
+                Text(model.t("状态", "Status"))
                     .frame(width: 40, alignment: .center)
-                Text("输入源 (Source)")
+                Text(model.t("输入源", "Source"))
                     .frame(width: 200, alignment: .leading)
                 Text("")
                     .frame(width: 20, alignment: .center)
-                Text("输出目标 (Destination)")
+                Text(model.t("输出目标", "Destination"))
                     .frame(width: 200, alignment: .leading)
-                Text("路由增益")
+                Text(model.t("路由增益", "Gain"))
                     .frame(width: 130, alignment: .center)
-                Text("静音")
+                Text(model.t("静音", "Mute"))
                     .frame(width: 50, alignment: .center)
                 Spacer()
-                Text("操作")
+                Text(model.t("操作", "Action"))
                     .frame(width: 40, alignment: .center)
             }
             .font(Theme.cnText(11, weight: .semibold))
             .foregroundColor(Theme.textTertiary)
             .padding(.horizontal, 16)
-            .padding(.vertical, 6)
+            .frame(height: 28)
             .background(Color.black.opacity(0.2))
 
             Divider().background(Theme.borderSubtle)
@@ -142,11 +146,12 @@ struct MatrixView: View {
                     Image(systemName: "arrow.triangle.branch")
                         .font(.system(size: 28))
                         .foregroundColor(Theme.textTertiary)
-                    Text("当前矩阵无活动路由连接。请在上方选择输入源与输出目标后点击“建立路由”。")
-                        .font(Theme.cnText(11))
+                    Text(model.t("无活动路由连接", "No Active Routes"))
+                        .font(Theme.cnText(12))
                         .foregroundColor(Theme.textTertiary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .help(model.t("在上方工具栏选择输入源与输出目标后点击“建立路由”即可添加通道连接", "Select source and destination above and click Connect to add route"))
             } else {
                 ScrollView {
                     VStack(spacing: 0) {
@@ -178,11 +183,10 @@ struct MatrixView: View {
 
                                     Slider(value: Binding(
                                         get: { r.gain },
-                                        set: { newVal in
-                                            // 预留微调
-                                        }
+                                        set: { newVal in }
                                     ), in: 0.0...2.0)
                                     .frame(width: 65)
+                                    .help(model.t("调节通道增益 (-12dB 至 +12dB)", "Adjust route channel gain (-12dB to +12dB)"))
                                 }
                                 .frame(width: 130, alignment: .center)
 
@@ -195,6 +199,7 @@ struct MatrixView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .frame(width: 50, alignment: .center)
+                                .help(model.t("切换通道静音状态", "Toggle channel mute"))
 
                                 Spacer()
 
@@ -207,9 +212,10 @@ struct MatrixView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .frame(width: 40, alignment: .center)
+                                .help(model.t("删除该条路由连接", "Delete this routing connection"))
                             }
                             .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
+                            .frame(height: 36)
                             .background(idx % 2 == 0 ? Color.clear : Theme.rowAltBg)
 
                             Divider().background(Theme.borderSubtle)

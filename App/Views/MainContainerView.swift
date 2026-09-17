@@ -23,17 +23,17 @@ struct MainContainerView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Theme.windowBg)
-        .frame(minWidth: 840, minHeight: 520)
+        .frame(minWidth: 920, idealWidth: 960, minHeight: 560, idealHeight: 580)
         .toolbar {
-            // 原生居中分段控制器 (Xcode / Logic Pro 原生风格)
+            // 原生居中分段控制器 (Logic Pro / Xcode 原生风格，严格固定宽度)
             ToolbarItem(placement: .principal) {
                 Picker("", selection: $model.activeTab) {
                     ForEach(AppTab.allCases) { tab in
-                        Text(tab.rawValue).tag(tab)
+                        Text(tab.title(for: model.language)).tag(tab)
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 420)
+                .frame(width: 440)
             }
 
             // 右侧状态与核心引擎启停
@@ -41,7 +41,7 @@ struct MainContainerView: View {
                 HStack(spacing: 8) {
                     StatusLed(isActive: model.isAudioRunning)
 
-                    Text(model.isAudioRunning ? "引擎就绪" : "引擎暂停")
+                    Text(model.isAudioRunning ? model.t("引擎就绪", "Engine Ready") : model.t("引擎暂停", "Engine Paused"))
                         .font(Theme.cnText(11, weight: .medium))
                         .foregroundColor(model.isAudioRunning ? Theme.meterGreen : Theme.alertRed)
 
@@ -55,8 +55,9 @@ struct MainContainerView: View {
                         Image(systemName: model.isAudioRunning ? "stop.fill" : "play.fill")
                             .font(.system(size: 10))
                     }
-                    .help(model.isAudioRunning ? "停止网络与音频引擎" : "启动网络与音频引擎")
+                    .help(model.isAudioRunning ? model.t("停止网络与音频引擎", "Stop audio & network engine") : model.t("启动网络与音频引擎", "Start audio & network engine"))
                 }
+                .frame(width: 130, alignment: .trailing)
             }
         }
     }

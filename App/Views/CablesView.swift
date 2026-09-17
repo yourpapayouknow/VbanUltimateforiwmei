@@ -9,36 +9,40 @@ struct CablesView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 顶部操作工具条
+            // 顶部操作工具条 (固定高度 38)
             HStack(spacing: 12) {
-                Text("虚拟音频线缆管理")
+                Text(model.t("虚拟音频线缆", "Virtual Audio Cables"))
                     .font(Theme.cnText(12, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
+                    .help(model.t("基于 CoreAudio AudioServerPlugIn 架构的低延迟虚拟声卡管理", "Low-latency virtual audio cable management based on CoreAudio AudioServerPlugIn"))
 
                 Spacer()
 
                 HStack(spacing: 8) {
-                    Text("名称:")
+                    Text(model.t("名称:", "Name:"))
                         .font(Theme.cnText(11))
                         .foregroundColor(Theme.textSecondary)
 
                     TextField("", text: $newCableName)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .font(Theme.monoDigit(11))
-                        .frame(width: 140)
+                        .frame(width: 130)
+                        .help(model.t("虚拟音频设备在系统中显示的名称", "Virtual audio device display name in macOS"))
 
-                    Picker("声道", selection: $newChannels) {
-                        Text("立体声 (2CH)").tag(UInt32(2))
-                        Text("单声道 (1CH)").tag(UInt32(1))
+                    Picker("", selection: $newChannels) {
+                        Text(model.t("立体声 (2CH)", "Stereo (2CH)")).tag(UInt32(2))
+                        Text(model.t("单声道 (1CH)", "Mono (1CH)")).tag(UInt32(1))
                     }
                     .frame(width: 110)
+                    .help(model.t("虚拟线缆的声道数量", "Channel count for virtual cable"))
 
-                    Picker("采样率", selection: $newSampleRate) {
+                    Picker("", selection: $newSampleRate) {
                         Text("44.1 kHz").tag(UInt32(44100))
                         Text("48.0 kHz").tag(UInt32(48000))
                         Text("96.0 kHz").tag(UInt32(96000))
                     }
-                    .frame(width: 100)
+                    .frame(width: 95)
+                    .help(model.t("虚拟线缆运行的硬件采样率", "Virtual cable hardware sample rate"))
 
                     Button(action: {
                         guard !newCableName.isEmpty else { return }
@@ -46,37 +50,38 @@ struct CablesView: View {
                         _ = model.addCable(id: cid, name: newCableName, channels: newChannels, sampleRate: newSampleRate)
                         newCableName = ""
                     }) {
-                        Label("新建线缆", systemImage: "plus")
+                        Label(model.t("新建线缆", "Add Cable"), systemImage: "plus")
                             .font(Theme.cnText(11, weight: .medium))
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.neonCyan)
+                    .help(model.t("动态创建并向 CoreAudio HAL 注册虚拟声卡设备", "Dynamically create and register virtual audio device with CoreAudio HAL"))
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .frame(height: 38)
             .background(Color.white.opacity(0.03))
 
             Divider().background(Theme.borderSubtle)
 
-            // 表头
+            // 表头 (固定高度 28)
             HStack(spacing: 12) {
-                Text("设备名称")
+                Text(model.t("设备名称", "Device Name"))
                     .frame(width: 180, alignment: .leading)
-                Text("CoreAudio 设备唯一标识 (UID)")
+                Text(model.t("设备标识", "Device Identifier"))
                     .frame(width: 280, alignment: .leading)
-                Text("配置")
+                Text(model.t("配置格式", "Configuration"))
                     .frame(width: 130, alignment: .leading)
-                Text("驱动总线")
+                Text(model.t("驱动总线", "Driver Bus"))
                     .frame(width: 90, alignment: .center)
                 Spacer()
-                Text("操作")
+                Text(model.t("操作", "Action"))
                     .frame(width: 40, alignment: .center)
             }
             .font(Theme.cnText(11, weight: .semibold))
             .foregroundColor(Theme.textTertiary)
             .padding(.horizontal, 16)
-            .padding(.vertical, 6)
+            .frame(height: 28)
             .background(Color.black.opacity(0.2))
 
             Divider().background(Theme.borderSubtle)
@@ -87,11 +92,12 @@ struct CablesView: View {
                     Image(systemName: "cable.connector.slash")
                         .font(.system(size: 28))
                         .foregroundColor(Theme.textTertiary)
-                    Text("当前系统无托管的虚拟音频线缆。可在右上角配置名称与格式后点击“新建线缆”。")
-                        .font(Theme.cnText(11))
+                    Text(model.t("无托管虚拟线缆", "No Virtual Cables"))
+                        .font(Theme.cnText(12))
                         .foregroundColor(Theme.textTertiary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .help(model.t("在上方工具栏配置名称与声道后点击“新建线缆”即可动态注入系统", "Configure name and format above and click Add Cable to register"))
             } else {
                 ScrollView {
                     VStack(spacing: 0) {
@@ -118,7 +124,7 @@ struct CablesView: View {
                                 }
                                 .frame(width: 130, alignment: .leading)
 
-                                Text("双向回环")
+                                Text(model.t("双向回环", "Loopback"))
                                     .font(Theme.cnText(11))
                                     .foregroundColor(Theme.meterGreen)
                                     .frame(width: 90, alignment: .center)
@@ -134,9 +140,10 @@ struct CablesView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .frame(width: 40, alignment: .center)
+                                .help(model.t("删除该条虚拟线缆设备", "Remove this virtual cable device"))
                             }
                             .padding(.horizontal, 16)
-                            .padding(.vertical, 9)
+                            .frame(height: 36)
                             .background(idx % 2 == 0 ? Color.clear : Theme.rowAltBg)
 
                             Divider().background(Theme.borderSubtle)
