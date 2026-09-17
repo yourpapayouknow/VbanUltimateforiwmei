@@ -1,0 +1,14 @@
+# Antigravity & OS
+.DS_Store
+/history/
+
+# References
+/refrence/
+
+# Build and Xcode
+.build/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+build/
+bin/
