@@ -33,6 +33,8 @@ struct StreamsView: View {
                 .frame(height: 38)
                 .background(Color.white.opacity(0.03))
 
+                Divider().background(Theme.borderSubtle)
+
                 // 固定高度表头
                 HStack(spacing: 12) {
                     Text(model.t("状态", "Status"))
@@ -130,32 +132,25 @@ struct StreamsView: View {
 
             Divider().background(Theme.borderSubtle)
 
-            // 发送流 (VBAN TX) - 固定高度底栏
-            VStack(alignment: .leading, spacing: 0) {
-                // 固定高度工具栏
+            // 发送流 (VBAN TX) - 固定单行紧凑底栏
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.up.circle.fill")
+                    .foregroundColor(Theme.amberWarn)
+                Text(model.t("音频发送流", "Outgoing Streams"))
+                    .font(Theme.cnText(12, weight: .bold))
+                    .foregroundColor(Theme.textPrimary)
+                    .help(model.t("向局域网单播或广播目标主机传输音频流", "Transmit audio stream to unicast or broadcast network targets"))
+
+                Spacer()
+
                 HStack(spacing: 8) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .foregroundColor(Theme.amberWarn)
-                    Text(model.t("音频发送流", "Outgoing Streams"))
-                        .font(Theme.cnText(12, weight: .bold))
-                        .foregroundColor(Theme.textPrimary)
-                        .help(model.t("向局域网单播或广播目标主机传输音频流", "Transmit audio stream to unicast or broadcast network targets"))
-
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-                .frame(height: 32)
-                .background(Color.white.opacity(0.03))
-
-                // 原生紧凑操作条 (固定高度 48)
-                HStack(spacing: 10) {
                     Text(model.t("流名称:", "Stream:"))
                         .font(Theme.cnText(11))
                         .foregroundColor(Theme.textSecondary)
                     TextField("", text: $newTxName)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .font(Theme.monoDigit(11))
-                        .frame(width: 120)
+                        .frame(width: 110)
                         .help(model.t("自定义发送音频流的名称标识", "Custom outgoing audio stream identifier"))
 
                     Text(model.t("目标IP:", "Target IP:"))
@@ -164,7 +159,7 @@ struct StreamsView: View {
                     TextField("", text: $newTxIp)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .font(Theme.monoDigit(11))
-                        .frame(width: 130)
+                        .frame(width: 120)
                         .help(model.t("接收端局域网 IP 地址（单播如 192.168.1.50，广播如 192.168.1.255）", "Target network IP (unicast or broadcast)"))
 
                     Text(model.t("端口:", "Port:"))
@@ -173,10 +168,8 @@ struct StreamsView: View {
                     TextField("", text: $newTxPort)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .font(Theme.monoDigit(11))
-                        .frame(width: 60)
+                        .frame(width: 55)
                         .help(model.t("目标监听 UDP 端口号（标准默认为 6980）", "Target UDP port number (standard 6980)"))
-
-                    Spacer()
 
                     Button(action: {
                         // 预留TX流添加动作
@@ -188,10 +181,10 @@ struct StreamsView: View {
                     .tint(Theme.neonCyan)
                     .help(model.t("创建并启动新的 VBAN 发送流", "Create and start new VBAN outgoing stream"))
                 }
-                .padding(.horizontal, 16)
-                .frame(height: 48)
-                .background(Color.black.opacity(0.15))
             }
+            .padding(.horizontal, 16)
+            .frame(height: 42)
+            .background(Color.white.opacity(0.02))
         }
         .background(Theme.windowBg)
     }
