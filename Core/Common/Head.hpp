@@ -27,4 +27,10 @@
 #include <fcntl.h>
 #include <poll.h>
 
+#if defined(__APPLE__)
+#include <CoreAudio/CoreAudio.h>
+#include <AudioToolbox/AudioToolbox.h>
+#include <CoreFoundation/CoreFoundation.h>
+#endif
+
 #endif // VBAN_COMMON_HEAD_HPP
