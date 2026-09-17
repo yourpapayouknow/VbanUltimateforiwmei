@@ -9,10 +9,10 @@ struct CablesView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 顶部操作工具条 (固定高度 38)
+            // 顶部操作工具条 (固定高度 40pt)
             HStack(spacing: 12) {
                 Text(model.t("虚拟音频线缆", "Virtual Audio Cables"))
-                    .font(Theme.cnText(12, weight: .bold))
+                    .font(Theme.cnText(14, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
                     .help(model.t("基于 CoreAudio AudioServerPlugIn 架构的低延迟虚拟声卡管理", "Low-latency virtual audio cable management based on CoreAudio AudioServerPlugIn"))
 
@@ -20,12 +20,12 @@ struct CablesView: View {
 
                 HStack(spacing: 8) {
                     Text(model.t("名称:", "Name:"))
-                        .font(Theme.cnText(11))
+                        .font(Theme.cnText(12, weight: .semibold))
                         .foregroundColor(Theme.textSecondary)
 
                     TextField("", text: $newCableName)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .font(Theme.monoDigit(11))
+                        .font(Theme.monoDigit(12.5, weight: .semibold))
                         .frame(width: 130)
                         .help(model.t("虚拟音频设备在系统中显示的名称", "Virtual audio device display name in macOS"))
 
@@ -33,7 +33,8 @@ struct CablesView: View {
                         Text(model.t("立体声 (2CH)", "Stereo (2CH)")).tag(UInt32(2))
                         Text(model.t("单声道 (1CH)", "Mono (1CH)")).tag(UInt32(1))
                     }
-                    .frame(width: 110)
+                    .font(Theme.cnText(12))
+                    .frame(width: 120)
                     .help(model.t("虚拟线缆的声道数量", "Channel count for virtual cable"))
 
                     Picker("", selection: $newSampleRate) {
@@ -41,7 +42,8 @@ struct CablesView: View {
                         Text("48.0 kHz").tag(UInt32(48000))
                         Text("96.0 kHz").tag(UInt32(96000))
                     }
-                    .frame(width: 95)
+                    .font(Theme.cnText(12))
+                    .frame(width: 100)
                     .help(model.t("虚拟线缆运行的硬件采样率", "Virtual cable hardware sample rate"))
 
                     Button(action: {
@@ -51,7 +53,7 @@ struct CablesView: View {
                         newCableName = ""
                     }) {
                         Label(model.t("新建线缆", "Add Cable"), systemImage: "plus")
-                            .font(Theme.cnText(11, weight: .medium))
+                            .font(Theme.cnText(12, weight: .semibold))
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.neonCyan)
@@ -59,29 +61,29 @@ struct CablesView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .frame(height: 38)
+            .frame(height: 40)
             .background(Color.white.opacity(0.03))
 
             Divider().background(Theme.borderSubtle)
 
-            // 表头 (固定高度 28)
+            // 表头 (固定高度 30pt)
             HStack(spacing: 12) {
                 Text(model.t("设备名称", "Device Name"))
-                    .frame(width: 180, alignment: .leading)
+                    .frame(width: 190, alignment: .leading)
                 Text(model.t("设备标识", "Device Identifier"))
-                    .frame(width: 280, alignment: .leading)
+                    .frame(width: 290, alignment: .leading)
                 Text(model.t("配置格式", "Configuration"))
-                    .frame(width: 130, alignment: .leading)
+                    .frame(width: 140, alignment: .leading)
                 Text(model.t("驱动总线", "Driver Bus"))
                     .frame(width: 90, alignment: .center)
                 Spacer()
                 Text(model.t("操作", "Action"))
-                    .frame(width: 40, alignment: .center)
+                    .frame(width: 44, alignment: .center)
             }
-            .font(Theme.cnText(11, weight: .semibold))
+            .font(Theme.cnText(12.5, weight: .bold))
             .foregroundColor(Theme.textTertiary)
             .padding(.horizontal, 16)
-            .frame(height: 28)
+            .frame(height: 30)
             .background(Color.black.opacity(0.2))
 
             Divider().background(Theme.borderSubtle)
@@ -93,7 +95,7 @@ struct CablesView: View {
                         .font(.system(size: 28))
                         .foregroundColor(Theme.textTertiary)
                     Text(model.t("无托管虚拟线缆", "No Virtual Cables"))
-                        .font(Theme.cnText(12))
+                        .font(Theme.cnText(14, weight: .semibold))
                         .foregroundColor(Theme.textTertiary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -105,27 +107,27 @@ struct CablesView: View {
                             HStack(spacing: 12) {
                                 HStack(spacing: 6) {
                                     Image(systemName: "cable.connector")
-                                        .font(.system(size: 11))
+                                        .font(.system(size: 12))
                                         .foregroundColor(Theme.neonCyan)
                                     Text(cbl.name)
-                                        .font(Theme.cnText(12, weight: .semibold))
+                                        .font(Theme.cnText(13.5, weight: .bold))
                                         .foregroundColor(Theme.textPrimary)
                                 }
-                                .frame(width: 180, alignment: .leading)
+                                .frame(width: 190, alignment: .leading)
 
                                 Text("com.iwmei.vbanultimate.audio.\(cbl.cableId)")
-                                    .font(Theme.monoDigit(11))
+                                    .font(Theme.monoDigit(12, weight: .medium))
                                     .foregroundColor(Theme.textTertiary)
-                                    .frame(width: 280, alignment: .leading)
+                                    .frame(width: 290, alignment: .leading)
 
                                 HStack(spacing: 4) {
                                     ParamCapsule(text: "\(cbl.channels) CH")
                                     ParamCapsule(text: "\(cbl.sampleRate / 1000) kHz", color: Theme.amberWarn)
                                 }
-                                .frame(width: 130, alignment: .leading)
+                                .frame(width: 140, alignment: .leading)
 
                                 Text(model.t("双向回环", "Loopback"))
-                                    .font(Theme.cnText(11))
+                                    .font(Theme.cnText(12.5, weight: .semibold))
                                     .foregroundColor(Theme.meterGreen)
                                     .frame(width: 90, alignment: .center)
 
@@ -135,15 +137,15 @@ struct CablesView: View {
                                     model.removeCable(id: cbl.cableId)
                                 }) {
                                     Image(systemName: "trash")
-                                        .font(.system(size: 11))
+                                        .font(.system(size: 12))
                                         .foregroundColor(Theme.alertRed)
                                 }
                                 .buttonStyle(.plain)
-                                .frame(width: 40, alignment: .center)
+                                .frame(width: 44, alignment: .center)
                                 .help(model.t("删除该条虚拟线缆设备", "Remove this virtual cable device"))
                             }
                             .padding(.horizontal, 16)
-                            .frame(height: 36)
+                            .frame(height: 38)
                             .background(idx % 2 == 0 ? Color.clear : Theme.rowAltBg)
 
                             Divider().background(Theme.borderSubtle)

@@ -16,15 +16,15 @@ enum Theme {
     static let alertRed     = Color(red: 0.95, green: 0.28, blue: 0.28)  // 丢包/离线红
     static let textPrimary  = Color(nsColor: .labelColor)
     static let textSecondary = Color(nsColor: .secondaryLabelColor)
-    static let textTertiary  = Color(nsColor: .tertiaryLabelColor)
+    static let textTertiary  = Color.white.opacity(0.65)  // 提升暗调下副级文本对比度，拒绝费眼
 
-    // 等宽数字字体 (杜绝高频刷新时文字横向抖动)
-    static func monoDigit(_ size: CGFloat, weight: Font.Weight = .medium) -> Font {
+    // 等宽数字字体 (杜绝高频刷新时文字横向抖动，强化字重与可读性)
+    static func monoDigit(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
         Font.system(size: size, weight: weight, design: .monospaced)
     }
 
-    // 中文标准系统文本
-    static func cnText(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+    // 中文标准系统文本 (强化默认字重，清晰易读)
+    static func cnText(_ size: CGFloat, weight: Font.Weight = .medium) -> Font {
         Font.system(size: size, weight: weight, design: .default)
     }
 }
@@ -38,7 +38,7 @@ struct StatusLed: View {
     var body: some View {
         Circle()
             .fill(isActive ? activeColor : offlineColor)
-            .frame(width: 7, height: 7)
+            .frame(width: 8, height: 8)
             .shadow(color: (isActive ? activeColor : Color.clear).opacity(0.6), radius: 3)
     }
 }
@@ -50,11 +50,11 @@ struct ParamCapsule: View {
 
     var body: some View {
         Text(text)
-            .font(Theme.monoDigit(11, weight: .medium))
+            .font(Theme.monoDigit(12, weight: .semibold))
             .foregroundColor(color)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Color.white.opacity(0.05))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color.white.opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
     }
 }

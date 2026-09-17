@@ -23,7 +23,7 @@ struct MainContainerView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Theme.windowBg)
-        .frame(minWidth: 920, idealWidth: 960, minHeight: 560, idealHeight: 580)
+        .frame(minWidth: 960, idealWidth: 1020, minHeight: 580, idealHeight: 620)
         .toolbar {
             // 原生居中分段控制器 (Logic Pro / Xcode 原生风格，严格固定宽度)
             ToolbarItem(placement: .principal) {
@@ -33,7 +33,7 @@ struct MainContainerView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 440)
+                .frame(width: 480)
             }
         }
     }
