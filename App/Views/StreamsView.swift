@@ -8,13 +8,10 @@ struct StreamsView: View {
         VStack(spacing: 0) {
             // 固定高度双列操作顶栏 (40pt)
             HStack(spacing: 0) {
-                // 左侧表头：接收流 (RX)
+                // 左侧表头：接收流 RX
                 HStack(spacing: 8) {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundColor(Theme.neonCyan)
-                    Text(model.t("接收流 (RX)", "Incoming Streams (RX)"))
-                        .font(Theme.cnText(14, weight: .bold))
+                    Text(model.t("接收流 RX", "Incoming Streams RX"))
+                        .font(Theme.cnText(16.5, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                         .help(model.t("局域网内向本机传输的 VBAN 接收流", "Incoming audio streams received from the local network"))
 
@@ -23,13 +20,10 @@ struct StreamsView: View {
                 .padding(.horizontal, 16)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                // 右侧表头：发送流 (TX)
+                // 右侧表头：发送流 TX
                 HStack(spacing: 8) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundColor(Theme.amberWarn)
-                    Text(model.t("发送流 (TX)", "Outgoing Streams (TX)"))
-                        .font(Theme.cnText(14, weight: .bold))
+                    Text(model.t("发送流 TX", "Outgoing Streams TX"))
+                        .font(Theme.cnText(16.5, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                         .help(model.t("从本机音频源采集并推向局域网的音频流", "Locally captured audio streams transmitted over the network"))
 
