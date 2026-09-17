@@ -253,10 +253,10 @@ struct TxStreamCard: View {
 
             Divider().background(Color.white.opacity(0.06))
 
-            // 卡片底栏：音频源（左）-> 箭头与真实带宽叠加（中）-> 目标 IP（右）
-            HStack(spacing: 8) {
-                // 左侧：音频源
-                HStack(spacing: 4) {
+            // 卡片底栏：音频源（左）-> 动态居中箭头与真实带宽叠加（中）-> 目标 IP（右）
+            HStack(alignment: .center, spacing: 10) {
+                // 左侧：音频源（紧凑自然对齐，无多余空白）
+                HStack(spacing: 5) {
                     Image(systemName: "waveform")
                         .font(.system(size: 11))
                         .foregroundColor(Theme.amberWarn)
@@ -265,22 +265,20 @@ struct TxStreamCard: View {
                         .foregroundColor(Theme.textPrimary)
                         .lineLimit(1)
                 }
-                .frame(minWidth: 80, maxWidth: 110, alignment: .leading)
 
-                // 正中间：横向箭头，真实带宽叠加显示在横线上
+                // 正中间：动态贯通横向箭头，真实带宽胶囊绝对居中叠加
                 ZStack {
                     HStack(spacing: 0) {
                         Rectangle()
-                            .fill(tx.enabled ? Theme.neonCyan.opacity(0.35) : Color.white.opacity(0.12))
+                            .fill(tx.enabled ? Theme.neonCyan.opacity(0.4) : Color.white.opacity(0.15))
                             .frame(height: 1.5)
-                        Image(systemName: "triangle.fill")
-                            .font(.system(size: 6))
-                            .rotationEffect(.degrees(90))
+                        Image(systemName: "arrowtriangle.right.fill")
+                            .font(.system(size: 6.5))
                             .foregroundColor(tx.enabled ? Theme.neonCyan : Theme.textTertiary)
-                            .offset(x: -2)
+                            .offset(x: -1)
                     }
 
-                    // 带宽胶囊叠加在横线上
+                    // 带宽胶囊叠加在横线上（在可用连接段绝对正中心）
                     Text(tx.enabled ? "\(tx.realKbps) kbps" : model.t("已暂停", "Paused"))
                         .font(Theme.monoDigit(11, weight: .bold))
                         .foregroundColor(tx.enabled ? Theme.meterGreen : Theme.textTertiary)
@@ -290,16 +288,16 @@ struct TxStreamCard: View {
                         .cornerRadius(3)
                         .overlay(
                             RoundedRectangle(cornerRadius: 3)
-                                .stroke(tx.enabled ? Theme.meterGreen.opacity(0.3) : Color.white.opacity(0.1), lineWidth: 1)
+                                .stroke(tx.enabled ? Theme.meterGreen.opacity(0.35) : Color.white.opacity(0.12), lineWidth: 1)
                         )
                 }
                 .frame(maxWidth: .infinity)
 
-                // 最右侧：目标 IP 地址（无端口，无地球图标）
+                // 最右侧：目标 IP 地址（紧凑自然对齐，箭头尖端直接等距指达）
                 Text(tx.targetIp)
                     .font(Theme.monoDigit(12.5, weight: .semibold))
                     .foregroundColor(Theme.textSecondary)
-                    .frame(minWidth: 90, maxWidth: 120, alignment: .trailing)
+                    .lineLimit(1)
             }
         }
         .padding(.horizontal, 12)
