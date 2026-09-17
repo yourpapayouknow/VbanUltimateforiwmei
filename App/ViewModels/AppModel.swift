@@ -57,6 +57,12 @@ struct VbanTxStreamDesc: Identifiable, Codable {
     var enabled: Bool
     var kbps: UInt32
     var packetsPerSec: UInt32
+
+    // 真实的无压缩 PCM 传输比特率（kbps）
+    var realKbps: UInt32 {
+        guard enabled else { return 0 }
+        return (sampleRate * channels * bitDepth) / 1000
+    }
 }
 
 final class AppModel: ObservableObject {
@@ -158,6 +164,23 @@ final class AppModel: ObservableObject {
 
     func removeTxStream(id: String) {
         txStreams.removeAll { $0.id == id }
+    }
+
+    func updateTxStream(id: String, name: String, sourceName: String, targetIp: String, targetPort: UInt16, sampleRate: UInt32, channels: UInt32, bitDepth: UInt32) {
+        if let idx = txStreams.firstIndex(where: { $0.id == id }) {
+            let kbps = (sampleRate * channels * bitDepth) / 1000
+            let pps: UInt32 = sampleRate / 256
+            txStreams[idx].name = name
+            txStreams[idx].sourceName = sourceName
+            txStreams[idx].targetIp = targetIp
+            txStreams[idx].targetPort = targetPort
+            txStreams[idx].sampleRate = sampleRate
+            txStreams[idx].channels = channels
+            txStreams[idx].bitDepth = bitDepth
+            txStreams[idx].kbps = kbps
+            txStreams[idx].packetsPerSec = pps
+            saveTxStreams()
+        }
     }
 
     func toggleTxStream(id: String) {

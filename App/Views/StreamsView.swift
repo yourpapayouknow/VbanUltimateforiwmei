@@ -196,10 +196,11 @@ struct RxStreamCard: View {
 struct TxStreamCard: View {
     let tx: VbanTxStreamDesc
     @ObservedObject var model: AppModel
+    @State private var showEditSheet = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // 卡片顶栏：状态 + 流名称 + 格式胶囊 + 控制按钮
+            // 卡片顶栏：状态 + 流名称 + 格式胶囊 + 启停/修改/删除按钮
             HStack(spacing: 8) {
                 StatusLed(isActive: tx.enabled, activeColor: Theme.meterGreen, offlineColor: Theme.alertRed)
 
@@ -225,6 +226,18 @@ struct TxStreamCard: View {
                 .buttonStyle(.plain)
                 .help(model.t(tx.enabled ? "暂停此发送流" : "启动此发送流", tx.enabled ? "Pause outgoing stream" : "Start outgoing stream"))
 
+                // 修改按钮（放在删除按钮旁边）
+                Button(action: { showEditSheet = true }) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(Theme.neonCyan)
+                        .frame(width: 22, height: 22)
+                        .background(Color.white.opacity(0.06))
+                        .cornerRadius(4)
+                }
+                .buttonStyle(.plain)
+                .help(model.t("修改此发送流配置", "Edit outgoing stream settings"))
+
                 // 删除按钮
                 Button(action: { model.removeTxStream(id: tx.id) }) {
                     Image(systemName: "trash")
@@ -240,8 +253,9 @@ struct TxStreamCard: View {
 
             Divider().background(Color.white.opacity(0.06))
 
-            // 卡片底栏：音频源 -> 目标网络地址 + 吞吐
+            // 卡片底栏：音频源（左）-> 箭头与真实带宽叠加（中）-> 目标 IP（右）
             HStack(spacing: 8) {
+                // 左侧：音频源
                 HStack(spacing: 4) {
                     Image(systemName: "waveform")
                         .font(.system(size: 11))
@@ -251,26 +265,41 @@ struct TxStreamCard: View {
                         .foregroundColor(Theme.textPrimary)
                         .lineLimit(1)
                 }
-                .frame(maxWidth: 140, alignment: .leading)
+                .frame(minWidth: 80, maxWidth: 110, alignment: .leading)
 
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(Theme.textTertiary)
+                // 正中间：横向箭头，真实带宽叠加显示在横线上
+                ZStack {
+                    HStack(spacing: 0) {
+                        Rectangle()
+                            .fill(tx.enabled ? Theme.neonCyan.opacity(0.35) : Color.white.opacity(0.12))
+                            .frame(height: 1.5)
+                        Image(systemName: "triangle.fill")
+                            .font(.system(size: 6))
+                            .rotationEffect(.degrees(90))
+                            .foregroundColor(tx.enabled ? Theme.neonCyan : Theme.textTertiary)
+                            .offset(x: -2)
+                    }
 
-                HStack(spacing: 4) {
-                    Image(systemName: "network")
-                        .font(.system(size: 11))
-                        .foregroundColor(Theme.textTertiary)
-                    Text("\(tx.targetIp):\(tx.targetPort)")
-                        .font(Theme.monoDigit(12, weight: .semibold))
-                        .foregroundColor(Theme.textSecondary)
+                    // 带宽胶囊叠加在横线上
+                    Text(tx.enabled ? "\(tx.realKbps) kbps" : model.t("已暂停", "Paused"))
+                        .font(Theme.monoDigit(11, weight: .bold))
+                        .foregroundColor(tx.enabled ? Theme.meterGreen : Theme.textTertiary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1.5)
+                        .background(Color(red: 0.14, green: 0.14, blue: 0.15))
+                        .cornerRadius(3)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 3)
+                                .stroke(tx.enabled ? Theme.meterGreen.opacity(0.3) : Color.white.opacity(0.1), lineWidth: 1)
+                        )
                 }
+                .frame(maxWidth: .infinity)
 
-                Spacer()
-
-                Text(tx.enabled ? "\(tx.kbps) kbps" : model.t("已暂停", "Paused"))
-                    .font(Theme.monoDigit(12, weight: .bold))
-                    .foregroundColor(tx.enabled ? Theme.meterGreen : Theme.textTertiary)
+                // 最右侧：目标 IP 地址（无端口，无地球图标）
+                Text(tx.targetIp)
+                    .font(Theme.monoDigit(12.5, weight: .semibold))
+                    .foregroundColor(Theme.textSecondary)
+                    .frame(minWidth: 90, maxWidth: 120, alignment: .trailing)
             }
         }
         .padding(.horizontal, 12)
@@ -281,6 +310,146 @@ struct TxStreamCard: View {
             RoundedRectangle(cornerRadius: 6)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
+        .sheet(isPresented: $showEditSheet) {
+            EditTxStreamSheet(model: model, tx: tx, isPresented: $showEditSheet)
+        }
+    }
+}
+
+// 修改发送流配置面板
+struct EditTxStreamSheet: View {
+    @ObservedObject var model: AppModel
+    let tx: VbanTxStreamDesc
+    @Binding var isPresented: Bool
+
+    @State private var name: String = ""
+    @State private var source: String = ""
+    @State private var targetIp: String = ""
+    @State private var targetPort: String = ""
+    @State private var sampleRate: UInt32 = 48000
+    @State private var channels: UInt32 = 2
+    @State private var bitDepth: UInt32 = 24
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "pencil.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(Theme.neonCyan)
+                Text(model.t("修改 VBAN 发送流配置", "Edit VBAN Outgoing Stream"))
+                    .font(Theme.cnText(14, weight: .bold))
+                    .foregroundColor(Theme.textPrimary)
+                Spacer()
+            }
+
+            Divider().background(Theme.borderSubtle)
+
+            VStack(spacing: 12) {
+                HStack {
+                    Text(model.t("流名称:", "Stream Name:"))
+                        .font(Theme.cnText(12.5, weight: .semibold))
+                        .frame(width: 90, alignment: .trailing)
+                    TextField("", text: $name)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .font(Theme.monoDigit(12.5, weight: .semibold))
+                }
+
+                HStack {
+                    Text(model.t("采集源:", "Source Audio:"))
+                        .font(Theme.cnText(12.5, weight: .semibold))
+                        .frame(width: 90, alignment: .trailing)
+                    Picker("", selection: $source) {
+                        ForEach(model.cables, id: \.name) { c in
+                            Text(model.t("线缆: \(c.name)", "Cable: \(c.name)")).tag(c.name)
+                        }
+                        ForEach(model.devices, id: \.name) { d in
+                            Text(model.t("设备: \(d.name)", "Device: \(d.name)")).tag(d.name)
+                        }
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                }
+
+                HStack {
+                    Text(model.t("目标 IP:", "Target IP:"))
+                        .font(Theme.cnText(12.5, weight: .semibold))
+                        .frame(width: 90, alignment: .trailing)
+                    TextField("", text: $targetIp)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .font(Theme.monoDigit(12.5, weight: .semibold))
+                }
+
+                HStack {
+                    Text(model.t("目标端口:", "Target Port:"))
+                        .font(Theme.cnText(12.5, weight: .semibold))
+                        .frame(width: 90, alignment: .trailing)
+                    TextField("", text: $targetPort)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .font(Theme.monoDigit(12.5, weight: .semibold))
+                }
+
+                HStack {
+                    Text(model.t("采样规格:", "Format:"))
+                        .font(Theme.cnText(12.5, weight: .semibold))
+                        .frame(width: 90, alignment: .trailing)
+
+                    Picker("", selection: $sampleRate) {
+                        Text("44.1 kHz").tag(UInt32(44100))
+                        Text("48.0 kHz").tag(UInt32(48000))
+                        Text("96.0 kHz").tag(UInt32(96000))
+                    }
+                    .pickerStyle(MenuPickerStyle())
+
+                    Picker("", selection: $channels) {
+                        Text(model.t("1 声道", "1 CH")).tag(UInt32(1))
+                        Text(model.t("2 声道", "2 CH")).tag(UInt32(2))
+                        Text(model.t("4 声道", "4 CH")).tag(UInt32(4))
+                        Text(model.t("8 声道", "8 CH")).tag(UInt32(8))
+                    }
+                    .pickerStyle(MenuPickerStyle())
+
+                    Picker("", selection: $bitDepth) {
+                        Text("16-bit").tag(UInt32(16))
+                        Text("24-bit").tag(UInt32(24))
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                }
+            }
+
+            Divider().background(Theme.borderSubtle)
+
+            HStack {
+                Spacer()
+                Button(model.t("取消", "Cancel")) {
+                    isPresented = false
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button(action: {
+                    let p = UInt16(targetPort) ?? tx.targetPort
+                    let src = source.isEmpty ? tx.sourceName : source
+                    model.updateTxStream(id: tx.id, name: name, sourceName: src, targetIp: targetIp, targetPort: p, sampleRate: sampleRate, channels: channels, bitDepth: bitDepth)
+                    isPresented = false
+                }) {
+                    Text(model.t("保存配置", "Save Settings"))
+                        .font(Theme.cnText(12.5, weight: .semibold))
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.neonCyan)
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 440)
+        .background(Theme.windowBg)
+        .onAppear {
+            name = tx.name
+            source = tx.sourceName
+            targetIp = tx.targetIp
+            targetPort = String(tx.targetPort)
+            sampleRate = tx.sampleRate
+            channels = tx.channels
+            bitDepth = tx.bitDepth
+        }
     }
 }
 
