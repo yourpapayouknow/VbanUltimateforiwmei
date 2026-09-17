@@ -1,0 +1,1165 @@
+```text
+你现在接手一个全新的 macOS 音频工具项目。
+
+项目目录已经创建，项目名：
+
+vbanultimateforiwmei
+
+你的任务不是做 Demo，而是从现在开始把它作为一个可长期维护、最终可日常稳定使用的 macOS 原生音频工具进行设计和实现。
+
+====================
+一、项目目标
+====================
+
+我要开发一个面向 macOS 的轻量、高性能 VBAN 音频工具，最终目标可以概括为：
+
+“VBAN Matrix + VBAN Talkie + 动态虚拟音频线缆管理器”
+
+但必须严格控制功能范围，不要发展成 DAW、Voicemeeter、Splitwave 或复杂 DSP 软件。
+
+核心只保留三类能力：
+
+1. 完整的 VBAN 音频发送/接收与矩阵管理
+2. macOS 虚拟音频设备/虚拟线缆创建和管理
+3. VBAN Talkie 已有的完整状态、质量和指标监控能力
+
+除此之外，不要主动加入：
+- EQ
+- Compressor
+- VST/AU 插件
+- 音效
+- 文件播放器
+- 系统录音
+- App Capture
+- ScreenCaptureKit
+- 多轨编辑
+- 复杂 Mixer
+- DSP Graph
+- 无关的音频工作站能力
+
+软件首先是一个：
+“VBAN 网络音频 + CoreAudio 虚拟线缆基础设施工具”。
+
+====================
+二、目标平台
+====================
+
+首要平台：
+
+macOS
+Apple Silicon 优先
+
+开发时首先保证：
+- arm64 原生
+- macOS 当前主流版本稳定运行
+
+架构设计不要阻止未来构建 Universal Binary，但第一阶段不要为了 Intel 增加明显复杂度。
+
+GUI 必须优先使用：
+Swift + SwiftUI
+
+底层实时音频部分不要放在 SwiftUI UI 线程。
+
+推荐整体结构：
+
+Swift / SwiftUI
+    ↓
+Objective-C++ Bridge（如有必要）
+    ↓
+C++20 Audio / Network Core
+    ↓
+CoreAudio + AudioServerPlugIn
+
+虚拟音频设备建议研究并优先采用：
+
+libASPL
++
+AudioServerPlugIn
+
+Splitwave 中与虚拟音频设备有关的实现可以作为重点参考。
+
+Splitwave 是参考实现，不是要把 Splitwave 整个搬进来。
+
+VBAN 协议部分优先自行实现干净、独立、可测试的协议层，可以参考现有开源实现和公开协议资料，但不要把整个旧项目硬塞进来。
+
+====================
+三、整体架构原则
+====================
+
+必须把项目拆成至少以下几个独立模块：
+
+1. VBAN Protocol
+2. VBAN Network Engine
+3. Audio Engine
+4. Virtual Cable Driver
+5. Device Manager
+6. Routing / Matrix
+7. Monitoring
+8. Persistence
+9. SwiftUI GUI
+
+禁止把网络收包、CoreAudio、UI、配置逻辑写进一个巨大类中。
+
+建议目录结构类似：
+
+vbanultimateforiwmei/
+├── App/
+├── Core/
+│   ├── VBAN/
+│   ├── Network/
+│   ├── Audio/
+│   ├── Routing/
+│   └── Monitoring/
+├── Driver/
+│   └── VirtualAudio/
+├── Bridge/
+├── Tests/
+├── Docs/
+├── Scripts/
+├── THIRD_PARTY_NOTICES.md
+├── README.md
+├── ARCHITECTURE.md
+└── PLAN.md
+
+可以根据实际工程体系调整，但必须保持模块边界。
+
+====================
+四、VBAN 功能
+====================
+
+这是项目最重要的一部分。
+
+目标不是像 VBAN Talkie 一样只能接收一条 Stream。
+
+必须从一开始设计为：
+
+多发送 Stream
++
+多接收 Stream
++
+同时工作
+
+网络层应该尽量做到：
+
+单个 UDP Socket
+        ↓
+VBAN Packet Parser
+        ↓
+按 StreamName / Source 等信息进行分流
+        ↓
+多个独立 Stream Context
+
+不要为了每个 VBAN Stream 启动一个完全独立的 Receiver 进程。
+
+接收端至少支持：
+
+- 多个 VBAN Audio Stream 同时存在
+- 相同 UDP 端口上的不同 StreamName
+- StreamName 筛选
+- Source IP 筛选
+- Source Port 信息
+- Enable / Disable
+- 自动发现新的 VBAN Stream
+- 手动固定 Stream
+- Stream 超时检测
+- Stream 自动恢复
+- PCM Audio VBAN
+- 正确解析 VBAN Header
+- Sample Rate
+- Channel Count
+- Bit Depth / Sample Format
+- Frame Counter
+- Stream Name
+
+发送端至少支持：
+
+- 多个发送 Stream
+- 每路独立：
+  - Stream Name
+  - Destination IP
+  - Destination Port
+  - Source Audio Device
+  - Channel Mapping
+  - Sample Rate
+  - Audio Format
+  - Enable / Disable
+- 同时向多个目标发送
+- 同一个源可以创建不同发送 Stream
+
+第一版重点保证 PCM Audio VBAN。
+
+不要在第一阶段扩展：
+VBAN MIDI
+VBAN Text
+VBAN Serial
+VBAN Service
+
+但 Protocol 层设计不要彻底堵死未来扩展这些类型的可能性。
+
+====================
+五、VBAN Matrix
+====================
+
+软件核心页面之一应该是 Matrix / Streams。
+
+不要把它做成传统 DAW Mixer。
+
+Matrix 的本质是：
+
+Source
+    ↓
+Destination
+
+Source 可以是：
+
+- CoreAudio Physical Input
+- Virtual Cable
+- VBAN RX Stream
+
+Destination 可以是：
+
+- CoreAudio Physical Output
+- Virtual Cable
+- VBAN TX Stream
+
+典型路线：
+
+Mac Input
+→ VBAN TX
+
+Virtual Cable
+→ VBAN TX
+
+VBAN RX
+→ Mac Speaker
+
+VBAN RX
+→ Virtual Cable
+
+最终希望可以做到：
+
+VBAN RX "PC-A"
+→ "VBAN PC-A" Virtual Cable
+
+VBAN RX "PC-B"
+→ "VBAN PC-B" Virtual Cable
+
+VBAN RX "Music"
+→ MacBook Pro Speakers
+
+BlackHole 不应该成为项目必要依赖。
+
+====================
+六、虚拟音频线缆
+====================
+
+这是第二核心模块。
+
+目标是实现：
+
+一个自己的 AudioServerPlugIn Driver
+        ↓
+由软件管理
+        ↓
+可以暴露多个独立 CoreAudio 虚拟音频设备
+
+不要采用：
+
+编译很多份 BlackHole2ch.driver
+
+这样的方案。
+
+目标应该更接近：
+
+VBANUltimateAudio.driver
+
+内部动态管理：
+
+Virtual Cable A
+Virtual Cable B
+Virtual Cable C
+Virtual Cable D
+
+macOS Audio MIDI Setup 以及其他软件应该能看到这些独立设备。
+
+例如：
+
+VBAN - PC A
+VBAN - PC B
+VBAN - Music
+VBAN - Talkback
+
+优先研究：
+
+Splitwave
+libASPL
+Apple AudioServerPlugIn API
+
+重点只提取 Splitwave 的：
+
+“虚拟设备创建、删除、命名、数据交换、生命周期管理”
+
+相关思想或兼容源码。
+
+不要搬入：
+
+- Splitwave Router
+- DSP
+- App Capture
+- Audio File
+- Effects
+- 其他节点系统
+
+我们自己拥有 Routing Engine。
+
+====================
+七、虚拟线缆 Manager
+====================
+
+GUI 中需要有单独的：
+
+Virtual Cables
+
+页面。
+
+用户应该能：
+
+Create Cable
+Delete Cable
+Rename Cable
+Enable / Disable Cable
+
+每个 Cable 至少配置：
+
+Name
+Channel Count
+Sample Rate
+
+第一阶段重点支持：
+
+Mono
+Stereo / 2ch
+
+设计层面允许未来扩展：
+
+4ch
+8ch
+16ch
+...
+
+但不要为暂时用不到的高声道数增加大量 UI。
+
+创建例如：
+
+Name:
+VBAN - PC A
+
+Channels:
+2
+
+Sample Rate:
+48000
+
+点击 Create 后：
+
+macOS CoreAudio 中应出现：
+
+VBAN - PC A
+
+并且任何正常 CoreAudio 软件都可以选择它。
+
+删除后设备应该正确消失。
+
+必须认真处理：
+
+- UID 唯一性
+- Device UID
+- Model UID
+- Driver UID
+- 持久化
+- Driver Reload
+- coreaudiod 生命周期
+- App 重启
+- macOS 重启
+- 设备恢复
+- 设备正在被其他 App 使用时删除的行为
+
+不要使用容易造成 CoreAudio 崩溃或者系统音频整体失效的粗暴方案。
+
+如果 AudioServerPlugIn 无法安全做到真正实时 Add/Remove Device，
+先研究正确生命周期机制。
+
+必要时可以允许：
+“修改配置 → 安全 reload driver”
+
+但 UI 必须把复杂操作隐藏起来。
+
+====================
+八、虚拟设备的数据方向
+====================
+
+必须把 Virtual Cable 的方向设计清楚。
+
+例如：
+
+VBAN RX
+→ Virtual Device
+
+对于其他应用来说，这应该作为：
+
+Input Device
+
+被 OBS、Logic、Discord 等读取。
+
+同时未来还需要：
+
+App
+→ Virtual Device
+→ VBAN TX
+
+也就是说虚拟设备最终应该支持完整的：
+
+Virtual Output
+→ Internal Buffer
+→ Virtual Input
+
+类似虚拟音频线缆。
+
+请不要把“Input Device”和“Output Device”的 CoreAudio 语义搞反。
+
+建立明确的数据流文档。
+
+====================
+九、实时音频要求
+====================
+
+音频线程必须遵守实时线程原则。
+
+Audio callback 中禁止：
+
+- malloc/new
+- 文件 IO
+- NSLog/大量日志
+- Mutex 长时间阻塞
+- 网络 DNS
+- UI 操作
+- JSON
+- 动态容器频繁扩容
+
+建议：
+
+Preallocated Ring Buffer
+Lock-free / wait-free where appropriate
+Atomic counters
+
+网络线程与 Audio Thread 之间通过：
+
+Ring Buffer
+
+交换 PCM 数据。
+
+VBAN RX：
+
+UDP
+→ Parser
+→ Jitter Buffer
+→ Audio Ring Buffer
+→ CoreAudio
+
+VBAN TX：
+
+CoreAudio
+→ Ring Buffer
+→ Packetizer
+→ UDP
+
+====================
+十、网络时序处理
+====================
+
+不能简单做到：
+
+收到 UDP 包
+→ 立刻播放
+
+必须设计基本的网络音频缓冲层。
+
+至少考虑：
+
+- packet loss
+- duplicate packet
+- out-of-order packet
+- frame counter discontinuity
+- jitter
+- buffer underrun
+- buffer overrun
+
+第一版不要求复杂 PLC，
+但不得因为单个 UDP packet 丢失导致整个 Stream 状态崩掉。
+
+建立：
+
+Jitter Buffer
+
+并尽可能使延迟保持低且稳定。
+
+目标优先级：
+
+稳定
+>
+低延迟
+>
+极端低缓存
+
+====================
+十一、VBAN Talkie 指标兼容
+====================
+
+我希望替代 VBAN Talkie。
+
+因此必须首先调查当前 VBAN Talkie macOS 版：
+
+- 所有可见信息
+- 所有状态字段
+- 所有统计指标
+- 所有网络指标
+- 所有音频格式指标
+- 所有 Stream 状态信息
+
+建立：
+
+Docs/VBANTALKIE_COMPATIBILITY.md
+
+列出：
+
+VBAN Talkie 功能
+当前项目对应功能
+状态
+备注
+
+目标是：
+
+凡 VBAN Talkie 当前能够显示的关键接收/发送信息，本项目都能显示。
+
+同时底层建议至少准备以下统计能力：
+
+Stream Name
+Direction
+Source IP
+Destination IP
+Port
+Sample Rate
+Channel Count
+Bit Depth / Format
+Packets Received
+Packets Sent
+Packets/s
+Audio Frames
+Payload Bitrate
+Frame Counter
+Lost Packets
+Duplicate Packets
+Out-of-order Packets
+Jitter
+Buffer Fill Level
+Buffer Underrun
+Buffer Overrun
+Last Packet Time
+Stream Uptime
+Current Stream Status
+
+但是：
+
+不要因为这个列表就凭空增加 Talkie 不存在的主界面指标。
+
+先调查 Talkie。
+
+额外诊断指标可以进入：
+
+Diagnostics / Advanced
+
+页面。
+
+====================
+十二、GUI 设计
+====================
+
+UI 必须原生、简单。
+
+不要做复杂节点编辑器。
+
+建议主界面：
+
+Sidebar:
+
+Overview
+Streams
+Matrix
+Virtual Cables
+Monitoring
+Settings
+
+Overview：
+
+当前状态摘要：
+
+VBAN RX: 3 Active
+VBAN TX: 2 Active
+Virtual Cables: 4
+Packet Loss: 0
+Audio Engine: Running
+
+Streams：
+
+分为：
+
+Receive
+Transmit
+
+Receive 示例：
+
+PC-A
+192.168.1.20:6980
+48 kHz
+24-bit
+Stereo
+Active
+
+Transmit 示例：
+
+Music
+→ 192.168.1.30:6980
+48 kHz
+Stereo
+Active
+
+Matrix：
+
+清晰显示 Source → Destination。
+
+Virtual Cables：
+
+管理虚拟设备。
+
+Monitoring：
+
+详细指标。
+
+Settings：
+
+- UDP default port
+- Buffer
+- Auto start
+- Driver status
+- Diagnostics
+
+尽量遵循 macOS 原生 UI。
+
+不要把 UI 做成 Windows Voicemeeter 风格。
+
+====================
+十三、配置持久化
+====================
+
+以下内容必须持久保存：
+
+- VBAN RX profiles
+- VBAN TX profiles
+- Matrix routing
+- Virtual cables
+- 用户设置
+
+重启 App 后恢复。
+
+macOS 重启后也应该恢复虚拟设备配置。
+
+配置文件应该使用：
+
+Application Support
+
+目录。
+
+格式可以：
+
+JSON / plist
+
+但必须：
+- 有 schema/version
+- 支持未来 migration
+- 不把临时运行状态写进永久配置
+
+====================
+十四、Driver 安装
+====================
+
+虚拟 AudioServerPlugIn Driver 的：
+
+Install
+Update
+Remove
+
+必须设计成正式功能。
+
+不要要求最终用户手工执行：
+
+cp xxx.driver /Library/Audio/Plug-Ins/HAL/
+
+开发阶段允许脚本。
+
+但最终需要：
+
+Install Driver
+Repair Driver
+Uninstall Driver
+
+状态界面至少能够显示：
+
+Driver Installed
+Driver Version
+Driver Loaded
+Driver Healthy
+
+如果需要管理员权限，采用合理的 macOS 权限流程。
+
+不要偷偷使用 sudo。
+
+====================
+十五、日志和诊断
+====================
+
+建立统一 Logging 系统。
+
+日志分类：
+
+VBAN
+Network
+Audio
+Driver
+Routing
+UI
+
+Release 模式不要刷屏。
+
+支持导出诊断信息。
+
+当音频异常时，我们需要知道究竟是：
+
+Network Loss
+Jitter
+Audio Underrun
+CoreAudio
+Driver
+Device
+Format mismatch
+
+哪一层出问题。
+
+====================
+十六、错误处理
+====================
+
+禁止“失败但 UI 看起来仍然正常”。
+
+例如：
+
+端口被占用
+→ 明确提示
+
+Driver 未加载
+→ 明确提示
+
+设备不存在
+→ Route 标记失效
+
+Sample Rate 不兼容
+→ 明确提示
+
+VBAN Stream 消失
+→ 显示 Offline
+
+恢复后：
+→ 自动恢复 Active
+
+====================
+十七、测试
+====================
+
+至少建立：
+
+VBAN Header parser unit tests
+
+Packet encode/decode tests
+
+Frame counter tests
+
+Stream demux tests
+
+Packet loss tests
+
+Out-of-order tests
+
+Ring buffer tests
+
+Configuration tests
+
+Virtual device lifecycle tests
+
+不要只测试 UI。
+
+最好建立一个本机测试模式：
+
+Internal Test Generator
+→ VBAN TX
+→ localhost
+→ VBAN RX
+
+从而可以不依赖第二台机器验证协议。
+
+这个功能可以隐藏在 Developer/Diagnostics 中。
+
+====================
+十八、性能目标
+====================
+
+这个软件应该非常轻。
+
+空闲状态不能明显占用 CPU。
+
+典型：
+
+4 路 Stereo 48kHz VBAN RX
++
+4 路 Stereo 48kHz VBAN TX
+
+应该能够长期稳定运行。
+
+不得因为 SwiftUI 刷新导致实时音频抖动。
+
+统计 UI 更新频率不需要跟音频 callback 一致。
+
+例如：
+
+500ms
+或
+1s
+
+更新一次即可。
+
+====================
+十九、第一阶段不要做
+====================
+
+严格禁止第一阶段 scope creep。
+
+不要做：
+
+MIDI
+VBAN Text
+Audio Plugin
+EQ
+Effects
+Recorder
+Player
+Screen Capture
+Per-App Capture
+Cloud
+Account
+Remote Control
+Web UI
+Mobile App
+Windows
+Linux
+Complex DSP
+Noise Reduction
+AI
+
+我们现在只做：
+
+VBAN
++
+Virtual Cable
++
+Routing
++
+Monitoring
+
+====================
+二十、开发阶段
+====================
+
+请按照阶段推进。
+
+Milestone 0
+项目调查和架构
+
+完成：
+- 检查当前项目目录
+- 建立 Git
+- 调研 VBAN 协议
+- 调研 VBAN Talkie
+- 调研 Splitwave 虚拟驱动实现
+- 调研 libASPL
+- 调研 AudioServerPlugIn
+- 输出 ARCHITECTURE.md
+- 输出 PLAN.md
+- 输出 VBANTALKIE_COMPATIBILITY.md
+- 明确第三方许可证
+
+此阶段不要急着堆 UI。
+
+Milestone 1
+VBAN Core
+
+完成：
+- VBAN Header parser
+- VBAN packet encoder
+- UDP RX
+- UDP TX
+- StreamName demux
+- 多 Stream
+- 基础统计
+- 单元测试
+
+CLI/测试程序即可验证。
+
+Milestone 2
+CoreAudio Engine
+
+完成：
+- 枚举 CoreAudio Device
+- Physical Input → VBAN TX
+- VBAN RX → Physical Output
+- Ring Buffer
+- Jitter Buffer
+- 多 Stream
+
+Milestone 3
+Virtual Cable Prototype
+
+完成：
+- AudioServerPlugIn
+- 创建至少一个 Stereo Virtual Device
+- macOS 能看到设备
+- App A 写入
+- App B 能读取
+- 长时间稳定
+
+Milestone 4
+Virtual Cable Manager
+
+完成：
+- 多 Virtual Device
+- 唯一 UID
+- Create
+- Delete
+- Rename
+- Persist
+- Driver reload/lifecycle
+
+至少验证：
+
+Cable A
+Cable B
+Cable C
+
+同时存在。
+
+Milestone 5
+Integration
+
+完成：
+
+VBAN RX A
+→ Cable A
+
+VBAN RX B
+→ Cable B
+
+Cable C
+→ VBAN TX C
+
+并可以同时运行。
+
+Milestone 6
+GUI
+
+完成 SwiftUI：
+
+Overview
+Streams
+Matrix
+Virtual Cables
+Monitoring
+Settings
+
+Milestone 7
+Stability
+
+完成：
+
+- 长时间测试
+- 网络断线恢复
+- Wi-Fi 切换
+- Sleep/Wake
+- CoreAudio restart
+- Driver restart
+- Device disconnect/reconnect
+- 多 Stream 压测
+- Packet loss 模拟
+
+====================
+二十一、第一版最终验收
+====================
+
+V1 的最低完成标准：
+
+1.
+Mac A 接收至少 4 路不同 VBAN Stream。
+
+2.
+4 路可以同时正常播放/工作。
+
+3.
+每路在 UI 中独立显示状态。
+
+4.
+每路可以单独 Enable / Disable。
+
+5.
+每路可以独立指定：
+
+Physical Output
+或
+Virtual Cable。
+
+6.
+至少创建：
+
+4 个独立 Stereo Virtual Cable。
+
+例如：
+
+VBAN A
+VBAN B
+VBAN C
+VBAN D
+
+7.
+macOS 和其他 CoreAudio App 能把这 4 个设备视为独立设备。
+
+8.
+可以：
+
+VBAN RX A → VBAN A
+VBAN RX B → VBAN B
+VBAN RX C → VBAN C
+VBAN RX D → VBAN D
+
+9.
+支持至少 4 路 VBAN TX。
+
+10.
+允许：
+
+Virtual Cable → VBAN TX。
+
+11.
+发送和接收可以同时工作。
+
+12.
+所有 VBAN Talkie 的主要监控指标都有对应实现。
+
+13.
+持续运行数小时不应：
+- 崩溃
+- 爆音
+- 明显内存增长
+- CoreAudio 崩溃
+- Stream 串音
+
+14.
+退出并重新启动 App 后配置恢复。
+
+15.
+Mac 重启后虚拟设备配置能够恢复。
+
+====================
+二十二、开发原则
+====================
+
+最重要：
+
+不要为了快速看到 GUI 而先造大量假数据。
+
+优先顺序：
+
+协议正确
+→ 音频正确
+→ Driver 正确
+→ Routing 正确
+→ Monitoring 正确
+→ GUI
+
+实时音频正确性高于 UI。
+
+每完成一个 Milestone：
+
+1. 更新 PLAN.md
+2. 更新 ARCHITECTURE.md（如果架构发生变化）
+3. 写明完成内容
+4. 写明测试结果
+5. 提交 Git commit
+
+不要留下大量 TODO 然后继续下一阶段。
+
+不要未经验证声称功能已经完成。
+
+====================
+二十三、现在立即执行
+====================
+
+从当前目录开始工作。
+
+第一步不要问我如何初始化项目。
+
+你自行检查环境与目录。
+
+然后：
+
+1. 查看当前目录状态
+2. 初始化合理的工程结构
+3. 调研上述关键技术
+4. 创建：
+   ARCHITECTURE.md
+   PLAN.md
+   Docs/VBANTALKIE_COMPATIBILITY.md
+   THIRD_PARTY_NOTICES.md
+5. 明确第一阶段技术选型
+6. 开始 Milestone 1
+
+如果遇到存在多个实现方案的问题：
+
+优先选择：
+
+简单
+稳定
+低延迟
+易维护
+原生 macOS
+
+而不是功能最多的方案。
+
+如果某项技术假设不成立，例如 AudioServerPlugIn 动态设备生命周期存在限制，不要硬实现。
+
+先查明 Apple/CoreAudio 正确机制，在 ARCHITECTURE.md 中记录事实、限制和最终设计，再继续。
+
+不要反复询问我非关键实现细节。
+
+只有遇到会直接改变产品方向、许可证或系统架构的重大决策时才需要暂停询问。
+
+项目最终目标始终保持：
+
+一个轻量、原生、稳定的 macOS VBAN 多流收发 + 虚拟音频线缆管理工具。
+
+现在开始。
+```
