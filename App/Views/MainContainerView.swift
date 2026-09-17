@@ -35,30 +35,6 @@ struct MainContainerView: View {
                 .pickerStyle(.segmented)
                 .frame(width: 440)
             }
-
-            // 右侧状态与核心引擎启停
-            ToolbarItem(placement: .automatic) {
-                HStack(spacing: 8) {
-                    StatusLed(isActive: model.isAudioRunning)
-
-                    Text(model.isAudioRunning ? model.t("引擎就绪", "Engine Ready") : model.t("引擎暂停", "Engine Paused"))
-                        .font(Theme.cnText(11, weight: .medium))
-                        .foregroundColor(model.isAudioRunning ? Theme.meterGreen : Theme.alertRed)
-
-                    Button(action: {
-                        if model.isAudioRunning {
-                            model.stop()
-                        } else {
-                            model.start()
-                        }
-                    }) {
-                        Image(systemName: model.isAudioRunning ? "stop.fill" : "play.fill")
-                            .font(.system(size: 10))
-                    }
-                    .help(model.isAudioRunning ? model.t("停止网络与音频引擎", "Stop audio & network engine") : model.t("启动网络与音频引擎", "Start audio & network engine"))
-                }
-                .frame(width: 130, alignment: .trailing)
-            }
         }
     }
 }
