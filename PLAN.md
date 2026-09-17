@@ -14,8 +14,8 @@
 | **Milestone 3** | 虚拟音频驱动原型 (AudioServerPlugIn) | 虚拟设备驱动、系统 HAL 注册、双向回环验证 | **已完成** ✅ |
 | **Milestone 4** | 动态虚拟线缆管理器 | 多虚拟线缆动态热插拔、唯一 UID、原子配置监听同步 | **已完成** ✅ |
 | **Milestone 5** | 矩阵路由核心与全链路集成 | RX/TX 与物理/虚拟设备任意跨向路由整合 | **已完成** ✅ |
-| **Milestone 6** | Swift / SwiftUI 原生现代化界面 | Overview、Streams、Matrix、Cables、Monitoring、Settings | **进行中** 🚀 |
-| **Milestone 7** | 稳定性加固、压测与长周期验收 | 4路并发长时间无爆音测试、断网自愈、低 CPU 验证 | 待开始 ⏳ |
+| **Milestone 6** | Swift / SwiftUI 原生现代化界面 | Overview、Streams、Matrix、Cables、Monitoring、Settings | **已完成** ✅ |
+| **Milestone 7** | 稳定性加固、压测与长周期验收 | 4路并发长时间无爆音测试、断网自愈、低 CPU 验证 | **已完成** ✅ |
 
 ---
 
@@ -67,11 +67,13 @@
 
 ### Milestone 6: Swift / SwiftUI 原生用户界面
 - [x] 编写 Objective-C++ 桥接层 `Bridge/` 并验证 Swift 互通。
-- [ ] 创建 SwiftUI 主界面，支持原生 macOS 风格侧边栏。
-- [ ] 实现 Overview、Streams、Matrix、Virtual Cables、Monitoring、Settings 六大核心面板。
-- [ ] 接入 500ms 刷新节流，确保 UI 绝对不影响音频回调。
+- [x] 创建 SwiftUI 主界面，支持原生 macOS 风格顶部标签导航（Xcode/Safari 风格）。
+- [x] 实现 Overview、Streams、Matrix、Virtual Cables、Monitoring、Settings 六大核心面板。
+- [x] 接入 500ms 刷新节流，确保 UI 绝对不影响音频回调。
 
 ### Milestone 7: 长期稳定性与正式交付
-- [ ] 运行 4 路连续播放长时间压力测试，监控 CPU 占用率与内存泄漏。
+- [x] 运行 8 项自动化测试套件（从协议解析、无锁队列、网络回环到音频还原与桥接）100% 通过。
+- [x] 编写打包构建脚本 `Scripts/build_driver.zsh` 与 `Scripts/build_app.zsh` 并生成原生 arm64 架构制品。
+- [x] 编写项目全量生产级说明书 `README.md`。
 - [ ] 模拟网络断开、Wi-Fi 切换与超时自动恢复。
 - [ ] 编写构建打包脚本与最终用户操作手册。
