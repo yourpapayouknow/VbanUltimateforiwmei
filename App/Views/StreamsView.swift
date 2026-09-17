@@ -23,8 +23,6 @@ struct StreamsView: View {
                 .padding(.horizontal, 16)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                Divider().background(Theme.borderSubtle)
-
                 // 右侧表头：发送流 (TX)
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.up.circle.fill")
