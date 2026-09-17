@@ -45,6 +45,20 @@ enum AppTab: String, CaseIterable, Identifiable {
     }
 }
 
+struct VbanTxStreamDesc: Identifiable, Codable {
+    var id: String
+    var name: String
+    var sourceName: String
+    var targetIp: String
+    var targetPort: UInt16
+    var sampleRate: UInt32
+    var channels: UInt32
+    var bitDepth: UInt32
+    var enabled: Bool
+    var kbps: UInt32
+    var packetsPerSec: UInt32
+}
+
 final class AppModel: ObservableObject {
     @Published var activeTab: AppTab = .streams
     @Published var language: AppLanguage = {
@@ -66,6 +80,11 @@ final class AppModel: ObservableObject {
     @Published var cables: [VbanCableDesc] = []
     @Published var devices: [VbanAudioDevDesc] = []
     @Published var routes: [VbanRouteDesc] = []
+    @Published var txStreams: [VbanTxStreamDesc] = [] {
+        didSet {
+            saveTxStreams()
+        }
+    }
     @Published var isAudioRunning: Bool = false
     @Published var udpPort: String = "6980"
 
@@ -73,6 +92,7 @@ final class AppModel: ObservableObject {
     private let bridge = VbanBridge.shared()
 
     init() {
+        loadTxStreams()
         start()
     }
 
@@ -108,6 +128,42 @@ final class AppModel: ObservableObject {
 
     func pollMetrics() {
         metrics = bridge.getSnapshot()
+        metrics.activeTx = UInt32(txStreams.filter(\.enabled).count)
+    }
+
+    // 发送流管理
+    private func loadTxStreams() {
+        if let data = UserDefaults.standard.data(forKey: "vban_tx_streams"),
+           let list = try? JSONDecoder().decode([VbanTxStreamDesc].self, from: data) {
+            txStreams = list
+        } else {
+            txStreams = [
+                VbanTxStreamDesc(id: "tx_1", name: "MasterOut", sourceName: "VBAN Cable A", targetIp: "192.168.1.50", targetPort: 6980, sampleRate: 48000, channels: 2, bitDepth: 24, enabled: true, kbps: 2304, packetsPerSec: 188)
+            ]
+        }
+    }
+
+    private func saveTxStreams() {
+        if let data = try? JSONEncoder().encode(txStreams) {
+            UserDefaults.standard.set(data, forKey: "vban_tx_streams")
+        }
+    }
+
+    func addTxStream(name: String, sourceName: String, targetIp: String, targetPort: UInt16, sampleRate: UInt32, channels: UInt32, bitDepth: UInt32) {
+        let kbps = sampleRate * channels * bitDepth / 1000
+        let pps: UInt32 = sampleRate / 256
+        let item = VbanTxStreamDesc(id: "tx_\(UUID().uuidString.prefix(8))", name: name, sourceName: sourceName, targetIp: targetIp, targetPort: targetPort, sampleRate: sampleRate, channels: channels, bitDepth: bitDepth, enabled: true, kbps: kbps, packetsPerSec: pps)
+        txStreams.append(item)
+    }
+
+    func removeTxStream(id: String) {
+        txStreams.removeAll { $0.id == id }
+    }
+
+    func toggleTxStream(id: String) {
+        if let idx = txStreams.firstIndex(where: { $0.id == id }) {
+            txStreams[idx].enabled.toggle()
+        }
     }
 
     // 虚拟线缆操作
