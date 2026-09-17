@@ -13,48 +13,51 @@ theme: Dark Professional Audio
 ---
 
 ## 1. Overview (视觉与设计理念)
-- **定位理念**：遵循 macOS 原生人机交互指南 (HIG)，打造现代轻量级专业网络音频基础设施工具。
-- **视觉风格**：深色暗调专业工具风格，去卡片化流动排版，专注音频流传输与虚拟线缆状态的直观呈现。
-- **信息密度**：兼顾专业工程师的高密度监控需求与高品质视觉美感，拒绝冗余装饰。
+- **定位理念**：遵循 macOS 原生人机交互指南 (HIG)，打造媲美 Loopback / Dante Controller 的专业级原生音频基础设施桌面应用。
+- **界面语言**：全界面原生中文（专业广电与音频工程术语）。
+- **去网页化与专业质感**：彻底摒弃 Web 端卡片堆叠与松散留白，采用 macOS 统一标题栏（Unified Toolbar）、原生分段控制器（Segmented Control）、密集型原生数据表格与交叉矩阵。
+- **信息架构收敛**：
+  - 核心标签保留：`音频流 (Streams)` | `路由矩阵 (Matrix)` | `虚拟线缆 (Cables)` | `监控诊断 (Monitoring)` | `设置与概览 (Settings)`
+  - 原独立“概览”收归至“设置与概览”模块作为系统仪表盘，突出核心音频流收发与矩阵操作。
 
 ---
 
 ## 2. Colors (色彩体系与语义色)
 - **基底底色**：
-  - Window Background: `#121214` (深黑磨砂底色)
-  - Surface Background: `#1E1E24` (微深灰面板底色)
-  - Elevated Popover: `#25252C` (浮层悬浮底色)
+  - Window Background: `NSColor.windowBackgroundColor` / `#16161A` (深度音频工作台底色)
+  - Surface Background: `NSColor.controlBackgroundColor` / `#202026` (控制板底色)
+  - Table Alternate Row: `rgba(255, 255, 255, 0.02)` (交替行斑马纹)
 - **品牌与强调色**：
-  - Primary Accent: `#00F2FE` (霓虹青，用于激活状态、选中的Tab与主连线)
-  - Secondary Accent: `#FFB300` (琥珀金，用于重要提示与特殊参数指示)
-- **状态语义色**：
-  - Active / Connected: `#10B981` (明快翡翠绿)
-  - Jitter / Warning: `#F59E0B` (预警琥珀黄)
-  - Error / Offline: `#EF4444` (告警珊瑚红)
-  - Disabled / Muted: `#6B7280` (中性低对比度冷灰)
+  - Primary Accent: `#00F2FE` (霓虹青，用于激活状态、选中的Tab与连线)
+  - Meter Green: `#10B981` (标准音频电平绿)
+  - Amber Warning: `#F59E0B` (警告与 Jitter 预警黄)
+  - Critical Red: `#EF4444` (丢包、离线与报错红)
+  - Muted Gray: `#71717A` (次级文本与未激活端点)
 
 ---
 
 ## 3. Typography (排版与字体规范)
 - **字体族阶梯**：
-  - 主体标题与界面标签：`SF Pro` (System Font)
-  - 音频参数、采样率、IP、端口与统计指标：`SF Mono` / `.monospacedDigit()`
-- **字阶与字重**：
-  - Page Title: `20pt`, Bold, Tracking: `-0.2pt`
-  - Section Header: `14pt`, Semibold, Secondary Color
-  - Body Text: `13pt`, Regular
-  - Metric Digits: `13pt`, Monospaced, Medium (杜绝高频数值变动时产生横向抖动)
-  - Footnote / Caption: `11pt`, Regular, Muted
+  - 标题与中文标签：系统原生中文字体（PingFang SC / SF Pro），中等字重。
+  - 音频技术参数（采样率、声道、IP、端口、时间戳、吞吐率、帧数）：统一使用系统等宽字体 `SF Mono` 并配置 `.monospacedDigit()`，严防数据刷新时横向抖动。
+- **字号阶梯**：
+  - Toolbar Title: `13pt`, Bold
+  - Section Header: `12pt`, Semibold, Muted
+  - Table Cell Text: `12pt`, Regular
+  - Metric Value: `12pt`, Monospaced Medium
+  - Subtitle / Description: `11pt`, Muted
 
 ---
 
 ## 4. Layout (界面布局与导航骨架)
-- **导航结构**：顶部多标签页集成导航（Top Segmented Navigation），布局类似 Xcode / Safari 工具栏。
-  - 核心标签：`Overview` | `Streams` | `Matrix` | `Virtual Cables` | `Monitoring` | `Settings`
-- **主视窗排版**：最大化单页面展示，去侧边栏侵占，充分利用水平视宽呈现音频路由与多流并发矩阵。
+- **窗口骨架**：
+  - 采用 macOS 原生统一工具栏（Unified Window Toolbar），使用原生 `Picker.pickerStyle(.segmented)` 置于顶部工具栏中心（Placement: `.principal`），彻底去除网页式自定义 TabBar。
+  - 窗口右上角常驻 CoreAudio 引擎工作状态（在线/离线）与即时启停控制。
+- **主工作区排版**：
+  - 单页面紧凑工作台，充满视窗，横向与纵向自适应伸缩，最大化保留交叉矩阵与多流监控可视区域。
 - **窗口尺寸规范**：
-  - 默认窗口尺寸：`960 x 640 pt`
-  - 最小窗口尺寸：`800 x 520 pt`
+  - 默认窗口尺寸：`920 x 600 pt`
+  - 最小窗口尺寸：`820 x 500 pt`
 
 ---
 

@@ -4,112 +4,124 @@ struct MonitoringView: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("DIAGNOSTICS & NETWORK METRICS")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(Color.white.opacity(0.8))
-                        Text("Full VBAN Talkie & Receptor telemetry: Packet continuity, Jitter ms, Duplicates, and Dropped frames.")
-                            .font(Theme.regularText(11))
-                            .foregroundColor(Theme.mutedGray)
-                    }
-                    Spacer()
-                    MicroCapsuleBadge(title: "500ms Throttled", color: Theme.amberGold)
+        VStack(spacing: 0) {
+            // 工具栏
+            HStack(spacing: 8) {
+                Text("网络音频监控与指标诊断")
+                    .font(Theme.cnText(12, weight: .bold))
+                    .foregroundColor(Theme.textPrimary)
+
+                Spacer()
+
+                ParamCapsule(text: "500ms 实时采样", color: Theme.amberWarn)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color.white.opacity(0.03))
+
+            Divider().background(Theme.borderSubtle)
+
+            // 表头
+            HStack(spacing: 10) {
+                Text("状态")
+                    .frame(width: 40, alignment: .center)
+                Text("流标识")
+                    .frame(width: 140, alignment: .leading)
+                Text("有效带宽")
+                    .frame(width: 100, alignment: .trailing)
+                Text("网络包率")
+                    .frame(width: 90, alignment: .trailing)
+                Text("累计音频帧")
+                    .frame(width: 110, alignment: .trailing)
+                Text("网络抖动")
+                    .frame(width: 80, alignment: .trailing)
+                Text("丢包计数")
+                    .frame(width: 70, alignment: .trailing)
+                Text("重复包")
+                    .frame(width: 60, alignment: .trailing)
+                Text("乱序包")
+                    .frame(width: 60, alignment: .trailing)
+                Spacer()
+            }
+            .font(Theme.cnText(11, weight: .semibold))
+            .foregroundColor(Theme.textTertiary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .background(Color.black.opacity(0.2))
+
+            Divider().background(Theme.borderSubtle)
+
+            // 指标数据行
+            if model.metrics.rxStreams.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "speedometer")
+                        .font(.system(size: 28))
+                        .foregroundColor(Theme.textTertiary)
+                    Text("无活动网络音频流指标。向本机发送音频流后将在此处实时刷新微秒级遥测数据。")
+                        .font(Theme.cnText(11))
+                        .foregroundColor(Theme.textTertiary)
                 }
-
-                Divider().background(Theme.borderSubtle)
-
-                if model.metrics.rxStreams.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "gauge.with.dots.needle.bottom.50percent")
-                            .font(.system(size: 32))
-                            .foregroundColor(Theme.mutedGray)
-                        Text("No active stream telemetry available. Once audio streams begin arriving, real-time metrics will render below.")
-                            .font(Theme.regularText(12))
-                            .foregroundColor(Theme.mutedGray)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
-                } else {
-                    // 诊断参数表
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
                     VStack(spacing: 0) {
-                        // 表头
-                        HStack(spacing: 12) {
-                            Text("STREAM")
-                                .frame(width: 120, alignment: .leading)
-                            Text("THROUGHPUT")
-                                .frame(width: 110, alignment: .trailing)
-                            Text("FRAMES")
-                                .frame(width: 100, alignment: .trailing)
-                            Text("JITTER")
-                                .frame(width: 80, alignment: .trailing)
-                            Text("LOST")
-                                .frame(width: 70, alignment: .trailing)
-                            Text("DUP")
-                                .frame(width: 60, alignment: .trailing)
-                            Text("ORDER")
-                                .frame(width: 70, alignment: .trailing)
-                            Spacer()
-                        }
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(Color.white.opacity(0.5))
-                        .padding(.vertical, 8)
+                        ForEach(Array(model.metrics.rxStreams.enumerated()), id: \.element.name) { idx, strm in
+                            HStack(spacing: 10) {
+                                StatusLed(isActive: strm.status == "Active")
+                                    .frame(width: 40, alignment: .center)
 
-                        Divider().background(Theme.borderSubtle)
-
-                        ForEach(model.metrics.rxStreams, id: \.name) { strm in
-                            HStack(spacing: 12) {
-                                HStack(spacing: 6) {
-                                    Circle()
-                                        .fill(strm.status == "Active" ? Theme.activeGreen : Theme.offlineRed)
-                                        .frame(width: 6, height: 6)
-                                    Text(strm.name)
-                                        .font(Theme.monoDigit(12, weight: .bold))
-                                        .foregroundColor(.white)
-                                }
-                                .frame(width: 120, alignment: .leading)
+                                Text(strm.name)
+                                    .font(Theme.monoDigit(12, weight: .bold))
+                                    .foregroundColor(Theme.textPrimary)
+                                    .frame(width: 140, alignment: .leading)
 
                                 Text("\(strm.kbps) kbps")
-                                    .font(Theme.monoDigit(12))
+                                    .font(Theme.monoDigit(11))
                                     .foregroundColor(Theme.neonCyan)
-                                    .frame(width: 110, alignment: .trailing)
-
-                                Text("\(strm.frameCount)")
-                                    .font(Theme.monoDigit(12))
-                                    .foregroundColor(.white.opacity(0.8))
                                     .frame(width: 100, alignment: .trailing)
 
+                                Text("\(strm.packetsPerSec) pkt/s")
+                                    .font(Theme.monoDigit(11))
+                                    .foregroundColor(Theme.textSecondary)
+                                    .frame(width: 90, alignment: .trailing)
+
+                                Text("\(strm.frameCount)")
+                                    .font(Theme.monoDigit(11))
+                                    .foregroundColor(Theme.textSecondary)
+                                    .frame(width: 110, alignment: .trailing)
+
                                 Text(String(format: "%.1f ms", strm.jitterMs))
-                                    .font(Theme.monoDigit(12))
-                                    .foregroundColor(strm.jitterMs > 20.0 ? Theme.warningAmber : Theme.activeGreen)
+                                    .font(Theme.monoDigit(11))
+                                    .foregroundColor(strm.jitterMs > 20.0 ? Theme.amberWarn : Theme.meterGreen)
                                     .frame(width: 80, alignment: .trailing)
 
                                 Text("\(strm.lostCount)")
-                                    .font(Theme.monoDigit(12, weight: .semibold))
-                                    .foregroundColor(strm.lostCount > 0 ? Theme.offlineRed : Theme.activeGreen)
+                                    .font(Theme.monoDigit(11, weight: .semibold))
+                                    .foregroundColor(strm.lostCount > 0 ? Theme.alertRed : Theme.meterGreen)
                                     .frame(width: 70, alignment: .trailing)
 
                                 Text("\(strm.duplicateCount)")
-                                    .font(Theme.monoDigit(12))
-                                    .foregroundColor(strm.duplicateCount > 0 ? Theme.warningAmber : Theme.mutedGray)
+                                    .font(Theme.monoDigit(11))
+                                    .foregroundColor(strm.duplicateCount > 0 ? Theme.amberWarn : Theme.textTertiary)
                                     .frame(width: 60, alignment: .trailing)
 
                                 Text("\(strm.orderErrorCount)")
-                                    .font(Theme.monoDigit(12))
-                                    .foregroundColor(strm.orderErrorCount > 0 ? Theme.warningAmber : Theme.mutedGray)
-                                    .frame(width: 70, alignment: .trailing)
+                                    .font(Theme.monoDigit(11))
+                                    .foregroundColor(strm.orderErrorCount > 0 ? Theme.amberWarn : Theme.textTertiary)
+                                    .frame(width: 60, alignment: .trailing)
 
                                 Spacer()
                             }
-                            .padding(.vertical, 10)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(idx % 2 == 0 ? Color.clear : Theme.rowAltBg)
+
                             Divider().background(Theme.borderSubtle)
                         }
                     }
                 }
             }
-            .padding(24)
         }
+        .background(Theme.windowBg)
     }
 }

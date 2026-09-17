@@ -9,197 +9,215 @@ struct MatrixView: View {
     @State private var selectedDstName = ""
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("AUDIO ROUTING MATRIX")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(Color.white.opacity(0.8))
-                        Text("Connect any Source (CoreAudio Input / Virtual Cable / VBAN RX) to any Destination (Output / Cable / TX).")
-                            .font(Theme.regularText(11))
-                            .foregroundColor(Theme.mutedGray)
+        VStack(spacing: 0) {
+            // 工具栏操作条
+            HStack(spacing: 12) {
+                Text("矩阵交叉连接")
+                    .font(Theme.cnText(12, weight: .bold))
+                    .foregroundColor(Theme.textPrimary)
+
+                Spacer()
+
+                // 源信号端点下拉
+                Menu {
+                    Section("物理输入设备") {
+                        ForEach(model.devices.filter { $0.inChannels > 0 }, id: \.uid) { d in
+                            Button("麦克风: \(d.name)") {
+                                selectedSrcId = d.uid
+                                selectedSrcName = d.name
+                            }
+                        }
                     }
-                    Spacer()
-                    MicroCapsuleBadge(title: "\(model.routes.count) Routes Active", color: Theme.neonCyan)
-                }
-
-                Divider().background(Theme.borderSubtle)
-
-                // 快速添加新路由连接器
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("CREATE NEW ROUTE")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(Theme.amberGold)
-
-                    HStack(spacing: 16) {
-                        // 源选择
-                        Menu {
-                            Section("Physical Inputs") {
-                                ForEach(model.devices.filter { $0.inChannels > 0 }, id: \.uid) { d in
-                                    Button(d.name) {
-                                        selectedSrcId = d.uid
-                                        selectedSrcName = d.name
-                                    }
-                                }
+                    Section("虚拟线缆输出") {
+                        ForEach(model.cables, id: \.cableId) { c in
+                            Button("线缆输出: \(c.name)") {
+                                selectedSrcId = c.cableId
+                                selectedSrcName = c.name
                             }
-                            Section("Virtual Cables") {
-                                ForEach(model.cables, id: \.cableId) { c in
-                                    Button(c.name) {
-                                        selectedSrcId = c.cableId
-                                        selectedSrcName = c.name
-                                    }
-                                }
-                            }
-                            Section("VBAN RX") {
-                                ForEach(model.metrics.rxStreams, id: \.name) { s in
-                                    Button("VBAN RX: \(s.name)") {
-                                        selectedSrcId = s.name
-                                        selectedSrcName = "VBAN RX (\(s.name))"
-                                    }
-                                }
-                            }
-                        } label: {
-                            HStack {
-                                Text(selectedSrcName.isEmpty ? "Select Source..." : selectedSrcName)
-                                    .font(Theme.regularText(12))
-                                    .foregroundColor(.white)
-                                Spacer()
-                                Image(systemName: "chevron.up.chevron.down")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(Theme.mutedGray)
-                            }
-                            .padding(8)
-                            .background(Theme.surfaceBg)
-                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         }
-                        .frame(maxWidth: .infinity)
-
-                        Image(systemName: "arrow.right")
-                            .foregroundColor(Theme.neonCyan)
-                            .font(.system(size: 14, weight: .bold))
-
-                        // 目标选择
-                        Menu {
-                            Section("Physical Outputs") {
-                                ForEach(model.devices.filter { $0.outChannels > 0 }, id: \.uid) { d in
-                                    Button(d.name) {
-                                        selectedDstId = d.uid
-                                        selectedDstName = d.name
-                                    }
-                                }
+                    }
+                    Section("网络接收流 (VBAN RX)") {
+                        ForEach(model.metrics.rxStreams, id: \.name) { s in
+                            Button("网络流: \(s.name)") {
+                                selectedSrcId = s.name
+                                selectedSrcName = "VBAN RX [\(s.name)]"
                             }
-                            Section("Virtual Cables") {
-                                ForEach(model.cables, id: \.cableId) { c in
-                                    Button(c.name) {
-                                        selectedDstId = c.cableId
-                                        selectedDstName = c.name
-                                    }
-                                }
-                            }
-                        } label: {
-                            HStack {
-                                Text(selectedDstName.isEmpty ? "Select Destination..." : selectedDstName)
-                                    .font(Theme.regularText(12))
-                                    .foregroundColor(.white)
-                                Spacer()
-                                Image(systemName: "chevron.up.chevron.down")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(Theme.mutedGray)
-                            }
-                            .padding(8)
-                            .background(Theme.surfaceBg)
-                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         }
-                        .frame(maxWidth: .infinity)
-
-                        Button(action: {
-                            guard !selectedSrcId.isEmpty, !selectedDstId.isEmpty else { return }
-                            model.addRoute(srcId: selectedSrcId, srcName: selectedSrcName,
-                                           dstId: selectedDstId, dstName: selectedDstName, gain: 1.0)
-                            selectedSrcId = ""
-                            selectedSrcName = ""
-                            selectedDstId = ""
-                            selectedDstName = ""
-                        }) {
-                            Text("Connect")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.black)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(Theme.neonCyan)
-                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        }
-                        .buttonStyle(PlainButtonStyle())
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.down.right.and.arrow.up.left")
+                            .font(.system(size: 10))
+                        Text(selectedSrcName.isEmpty ? "选择输入源..." : selectedSrcName)
+                            .font(Theme.cnText(11))
                     }
                 }
-                .padding(14)
-                .background(Theme.surfaceBg.opacity(0.6))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Theme.borderSubtle, lineWidth: 1)
-                )
+                .menuStyle(.borderedButton)
+                .frame(width: 170)
 
-                // 已激活路由列表 (去卡片化行式布局)
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("ACTIVE MATRIX CONNECTIONS")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(Color.white.opacity(0.6))
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(Theme.textTertiary)
 
-                    if model.routes.isEmpty {
-                        Text("No active cross-routes configured. Create a connection above to bridge audio streams.")
-                            .font(Theme.regularText(12))
-                            .foregroundColor(Theme.mutedGray)
-                            .padding(.vertical, 12)
-                    } else {
-                        VStack(spacing: 0) {
-                            ForEach(model.routes, id: \.routeId) { r in
-                                HStack(spacing: 16) {
-                                    Circle()
-                                        .fill(r.enabled ? Theme.neonCyan : Theme.mutedGray)
-                                        .frame(width: 8, height: 8)
-
-                                    Text(r.srcName)
-                                        .font(Theme.regularText(13, weight: .semibold))
-                                        .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                                    Image(systemName: "arrow.right")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(Theme.mutedGray)
-
-                                    Text(r.dstName)
-                                        .font(Theme.regularText(13, weight: .semibold))
-                                        .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                                    MicroCapsuleBadge(title: String(format: "%.1f dB", (r.gain - 1.0) * 12.0), color: Theme.amberGold)
-
-                                    Button(action: {
-                                        model.toggleRoute(id: r.routeId, enabled: !r.enabled)
-                                    }) {
-                                        Image(systemName: r.enabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                                            .foregroundColor(r.enabled ? Theme.activeGreen : Theme.mutedGray)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-
-                                    Button(action: {
-                                        model.removeRoute(id: r.routeId)
-                                    }) {
-                                        Image(systemName: "trash")
-                                            .foregroundColor(Theme.offlineRed)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                }
-                                .padding(.vertical, 10)
-                                Divider().background(Theme.borderSubtle)
+                // 目标端点下拉
+                Menu {
+                    Section("物理输出设备") {
+                        ForEach(model.devices.filter { $0.outChannels > 0 }, id: \.uid) { d in
+                            Button("扬声器: \(d.name)") {
+                                selectedDstId = d.uid
+                                selectedDstName = d.name
                             }
+                        }
+                    }
+                    Section("虚拟线缆输入") {
+                        ForEach(model.cables, id: \.cableId) { c in
+                            Button("线缆输入: \(c.name)") {
+                                selectedDstId = c.cableId
+                                selectedDstName = c.name
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.up.right.and.arrow.down.left")
+                            .font(.system(size: 10))
+                        Text(selectedDstName.isEmpty ? "选择输出目标..." : selectedDstName)
+                            .font(Theme.cnText(11))
+                    }
+                }
+                .menuStyle(.borderedButton)
+                .frame(width: 170)
+
+                Button(action: {
+                    guard !selectedSrcId.isEmpty, !selectedDstId.isEmpty else { return }
+                    model.addRoute(srcId: selectedSrcId, srcName: selectedSrcName,
+                                   dstId: selectedDstId, dstName: selectedDstName, gain: 1.0)
+                    selectedSrcId = ""
+                    selectedSrcName = ""
+                    selectedDstId = ""
+                    selectedDstName = ""
+                }) {
+                    Label("建立路由", systemImage: "link")
+                        .font(Theme.cnText(11, weight: .medium))
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.neonCyan)
+                .disabled(selectedSrcId.isEmpty || selectedDstId.isEmpty)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color.white.opacity(0.03))
+
+            Divider().background(Theme.borderSubtle)
+
+            // 表头
+            HStack(spacing: 12) {
+                Text("状态")
+                    .frame(width: 40, alignment: .center)
+                Text("输入源 (Source)")
+                    .frame(width: 200, alignment: .leading)
+                Text("")
+                    .frame(width: 20, alignment: .center)
+                Text("输出目标 (Destination)")
+                    .frame(width: 200, alignment: .leading)
+                Text("路由增益")
+                    .frame(width: 130, alignment: .center)
+                Text("静音")
+                    .frame(width: 50, alignment: .center)
+                Spacer()
+                Text("操作")
+                    .frame(width: 40, alignment: .center)
+            }
+            .font(Theme.cnText(11, weight: .semibold))
+            .foregroundColor(Theme.textTertiary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .background(Color.black.opacity(0.2))
+
+            Divider().background(Theme.borderSubtle)
+
+            // 路由规则列表
+            if model.routes.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(.system(size: 28))
+                        .foregroundColor(Theme.textTertiary)
+                    Text("当前矩阵无活动路由连接。请在上方选择输入源与输出目标后点击“建立路由”。")
+                        .font(Theme.cnText(11))
+                        .foregroundColor(Theme.textTertiary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(Array(model.routes.enumerated()), id: \.element.routeId) { idx, r in
+                            HStack(spacing: 12) {
+                                StatusLed(isActive: r.enabled, activeColor: Theme.neonCyan)
+                                    .frame(width: 40, alignment: .center)
+
+                                Text(r.srcName)
+                                    .font(Theme.cnText(12, weight: .medium))
+                                    .foregroundColor(Theme.textPrimary)
+                                    .frame(width: 200, alignment: .leading)
+
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(Theme.textTertiary)
+                                    .frame(width: 20, alignment: .center)
+
+                                Text(r.dstName)
+                                    .font(Theme.cnText(12, weight: .medium))
+                                    .foregroundColor(Theme.textPrimary)
+                                    .frame(width: 200, alignment: .leading)
+
+                                HStack(spacing: 6) {
+                                    Text(String(format: "%+.1f dB", (r.gain - 1.0) * 12.0))
+                                        .font(Theme.monoDigit(11))
+                                        .foregroundColor(Theme.neonCyan)
+                                        .frame(width: 55, alignment: .trailing)
+
+                                    Slider(value: Binding(
+                                        get: { r.gain },
+                                        set: { newVal in
+                                            // 预留微调
+                                        }
+                                    ), in: 0.0...2.0)
+                                    .frame(width: 65)
+                                }
+                                .frame(width: 130, alignment: .center)
+
+                                Button(action: {
+                                    model.toggleRoute(id: r.routeId, enabled: !r.enabled)
+                                }) {
+                                    Image(systemName: r.enabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(r.enabled ? Theme.meterGreen : Theme.textTertiary)
+                                }
+                                .buttonStyle(.plain)
+                                .frame(width: 50, alignment: .center)
+
+                                Spacer()
+
+                                Button(action: {
+                                    model.removeRoute(id: r.routeId)
+                                }) {
+                                    Image(systemName: "trash")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(Theme.alertRed)
+                                }
+                                .buttonStyle(.plain)
+                                .frame(width: 40, alignment: .center)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(idx % 2 == 0 ? Color.clear : Theme.rowAltBg)
+
+                            Divider().background(Theme.borderSubtle)
                         }
                     }
                 }
             }
-            .padding(24)
         }
+        .background(Theme.windowBg)
     }
 }

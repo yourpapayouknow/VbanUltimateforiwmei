@@ -54,7 +54,6 @@ swiftc -O \
     "$PROJECT_DIR/bin/BridgeCore.o" \
     "$PROJECT_DIR/App/Theme.swift" \
     "$PROJECT_DIR/App/ViewModels/AppModel.swift" \
-    "$PROJECT_DIR/App/Views/OverviewView.swift" \
     "$PROJECT_DIR/App/Views/StreamsView.swift" \
     "$PROJECT_DIR/App/Views/MatrixView.swift" \
     "$PROJECT_DIR/App/Views/CablesView.swift" \

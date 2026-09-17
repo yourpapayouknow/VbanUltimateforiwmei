@@ -2,29 +2,27 @@ import SwiftUI
 import Combine
 
 enum AppTab: String, CaseIterable, Identifiable {
-    case overview = "Overview"
-    case streams  = "Streams"
-    case matrix   = "Matrix"
-    case cables   = "Virtual Cables"
-    case monitor  = "Monitoring"
-    case settings = "Settings"
+    case streams  = "音频流"
+    case matrix   = "路由矩阵"
+    case cables   = "虚拟线缆"
+    case monitor  = "监控诊断"
+    case settings = "设置与概览"
 
     var id: String { rawValue }
 
     var icon: String {
         switch self {
-        case .overview: return "waveform.circle.fill"
-        case .streams:  return "antenna.radiowaves.left.and.right"
+        case .streams:  return "waveform"
         case .matrix:   return "arrow.triangle.branch"
         case .cables:   return "cable.connector"
-        case .monitor:  return "gauge.with.dots.needle.bottom.50percent"
-        case .settings: return "gearshape.fill"
+        case .monitor:  return "speedometer"
+        case .settings: return "gearshape.2"
         }
     }
 }
 
 final class AppModel: ObservableObject {
-    @Published var activeTab: AppTab = .overview
+    @Published var activeTab: AppTab = .streams
     @Published var metrics: VbanAppMetric = VbanAppMetric()
     @Published var cables: [VbanCableDesc] = []
     @Published var devices: [VbanAudioDevDesc] = []

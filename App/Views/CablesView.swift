@@ -8,123 +8,143 @@ struct CablesView: View {
     @State private var newSampleRate: UInt32 = 48000
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("DYNAMIC VIRTUAL AUDIO CABLES")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(Color.white.opacity(0.8))
-                        Text("Manage macOS AudioServerPlugIn virtual cables. Devices are dynamically added and removed in real-time.")
-                            .font(Theme.regularText(11))
-                            .foregroundColor(Theme.mutedGray)
+        VStack(spacing: 0) {
+            // 顶部操作工具条
+            HStack(spacing: 12) {
+                Text("虚拟音频线缆管理")
+                    .font(Theme.cnText(12, weight: .bold))
+                    .foregroundColor(Theme.textPrimary)
+
+                Spacer()
+
+                HStack(spacing: 8) {
+                    Text("名称:")
+                        .font(Theme.cnText(11))
+                        .foregroundColor(Theme.textSecondary)
+
+                    TextField("", text: $newCableName)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .font(Theme.monoDigit(11))
+                        .frame(width: 140)
+
+                    Picker("声道", selection: $newChannels) {
+                        Text("立体声 (2CH)").tag(UInt32(2))
+                        Text("单声道 (1CH)").tag(UInt32(1))
                     }
-                    Spacer()
-                    MicroCapsuleBadge(title: "\(model.cables.count) Cables Active", color: Theme.neonCyan)
-                }
+                    .frame(width: 110)
 
-                Divider().background(Theme.borderSubtle)
-
-                // 快速创建新虚拟线缆输入栏
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("CREATE VIRTUAL CABLE")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(Theme.amberGold)
-
-                    HStack(spacing: 16) {
-                        TextField("Cable Name (e.g. VBAN - PC A)", text: $newCableName)
-                            .textFieldStyle(PlainTextFieldStyle())
-                            .padding(8)
-                            .background(Theme.surfaceBg)
-                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                            .font(Theme.regularText(12))
-
-                        Picker("Channels", selection: $newChannels) {
-                            Text("Mono (1ch)").tag(UInt32(1))
-                            Text("Stereo (2ch)").tag(UInt32(2))
-                        }
-                        .frame(width: 130)
-
-                        Picker("Rate", selection: $newSampleRate) {
-                            Text("44.1 kHz").tag(UInt32(44100))
-                            Text("48.0 kHz").tag(UInt32(48000))
-                            Text("96.0 kHz").tag(UInt32(96000))
-                        }
-                        .frame(width: 120)
-
-                        Button(action: {
-                            guard !newCableName.isEmpty else { return }
-                            let cid = "cbl_\(UUID().uuidString.prefix(8).lowercased())"
-                            _ = model.addCable(id: cid, name: newCableName, channels: newChannels, sampleRate: newSampleRate)
-                            newCableName = ""
-                        }) {
-                            Text("Create Cable")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.black)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(Theme.neonCyan)
-                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        }
-                        .buttonStyle(PlainButtonStyle())
+                    Picker("采样率", selection: $newSampleRate) {
+                        Text("44.1 kHz").tag(UInt32(44100))
+                        Text("48.0 kHz").tag(UInt32(48000))
+                        Text("96.0 kHz").tag(UInt32(96000))
                     }
+                    .frame(width: 100)
+
+                    Button(action: {
+                        guard !newCableName.isEmpty else { return }
+                        let cid = "cbl_\(UUID().uuidString.prefix(6).lowercased())"
+                        _ = model.addCable(id: cid, name: newCableName, channels: newChannels, sampleRate: newSampleRate)
+                        newCableName = ""
+                    }) {
+                        Label("新建线缆", systemImage: "plus")
+                            .font(Theme.cnText(11, weight: .medium))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.neonCyan)
                 }
-                .padding(14)
-                .background(Theme.surfaceBg.opacity(0.6))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Theme.borderSubtle, lineWidth: 1)
-                )
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color.white.opacity(0.03))
 
-                // 已激活虚拟设备列表 (去卡片化行式布局)
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("MANAGED COREAUDIO VIRTUAL DEVICES")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(Color.white.opacity(0.6))
+            Divider().background(Theme.borderSubtle)
 
-                    if model.cables.isEmpty {
-                        Text("No virtual cables registered. Add a cable above to expose it to system audio.")
-                            .font(Theme.regularText(12))
-                            .foregroundColor(Theme.mutedGray)
-                            .padding(.vertical, 12)
-                    } else {
-                        VStack(spacing: 0) {
-                            ForEach(model.cables, id: \.cableId) { cbl in
-                                HStack(spacing: 16) {
+            // 表头
+            HStack(spacing: 12) {
+                Text("设备名称")
+                    .frame(width: 180, alignment: .leading)
+                Text("CoreAudio 设备唯一标识 (UID)")
+                    .frame(width: 280, alignment: .leading)
+                Text("配置")
+                    .frame(width: 130, alignment: .leading)
+                Text("驱动总线")
+                    .frame(width: 90, alignment: .center)
+                Spacer()
+                Text("操作")
+                    .frame(width: 40, alignment: .center)
+            }
+            .font(Theme.cnText(11, weight: .semibold))
+            .foregroundColor(Theme.textTertiary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .background(Color.black.opacity(0.2))
+
+            Divider().background(Theme.borderSubtle)
+
+            // 虚拟线缆列表
+            if model.cables.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "cable.connector.slash")
+                        .font(.system(size: 28))
+                        .foregroundColor(Theme.textTertiary)
+                    Text("当前系统无托管的虚拟音频线缆。可在右上角配置名称与格式后点击“新建线缆”。")
+                        .font(Theme.cnText(11))
+                        .foregroundColor(Theme.textTertiary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(Array(model.cables.enumerated()), id: \.element.cableId) { idx, cbl in
+                            HStack(spacing: 12) {
+                                HStack(spacing: 6) {
                                     Image(systemName: "cable.connector")
+                                        .font(.system(size: 11))
                                         .foregroundColor(Theme.neonCyan)
-
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(cbl.name)
-                                            .font(Theme.regularText(13, weight: .semibold))
-                                            .foregroundColor(.white)
-                                        Text("UID: com.iwmei.vbanultimate.audio.\(cbl.cableId)")
-                                            .font(Theme.monoDigit(10))
-                                            .foregroundColor(Theme.mutedGray)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                                    MicroCapsuleBadge(title: "\(cbl.channels) CH", color: .white.opacity(0.8))
-                                    MicroCapsuleBadge(title: "\(cbl.sampleRate / 1000) kHz", color: Theme.amberGold)
-                                    MicroCapsuleBadge(title: "HAL Loopback", color: Theme.activeGreen)
-
-                                    Button(action: {
-                                        model.removeCable(id: cbl.cableId)
-                                    }) {
-                                        Image(systemName: "trash")
-                                            .foregroundColor(Theme.offlineRed)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
+                                    Text(cbl.name)
+                                        .font(Theme.cnText(12, weight: .semibold))
+                                        .foregroundColor(Theme.textPrimary)
                                 }
-                                .padding(.vertical, 12)
-                                Divider().background(Theme.borderSubtle)
+                                .frame(width: 180, alignment: .leading)
+
+                                Text("com.iwmei.vbanultimate.audio.\(cbl.cableId)")
+                                    .font(Theme.monoDigit(11))
+                                    .foregroundColor(Theme.textTertiary)
+                                    .frame(width: 280, alignment: .leading)
+
+                                HStack(spacing: 4) {
+                                    ParamCapsule(text: "\(cbl.channels) CH")
+                                    ParamCapsule(text: "\(cbl.sampleRate / 1000) kHz", color: Theme.amberWarn)
+                                }
+                                .frame(width: 130, alignment: .leading)
+
+                                Text("双向回环")
+                                    .font(Theme.cnText(11))
+                                    .foregroundColor(Theme.meterGreen)
+                                    .frame(width: 90, alignment: .center)
+
+                                Spacer()
+
+                                Button(action: {
+                                    model.removeCable(id: cbl.cableId)
+                                }) {
+                                    Image(systemName: "trash")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(Theme.alertRed)
+                                }
+                                .buttonStyle(.plain)
+                                .frame(width: 40, alignment: .center)
                             }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 9)
+                            .background(idx % 2 == 0 ? Color.clear : Theme.rowAltBg)
+
+                            Divider().background(Theme.borderSubtle)
                         }
                     }
                 }
             }
-            .padding(24)
         }
+        .background(Theme.windowBg)
     }
 }
