@@ -35,6 +35,20 @@ struct MainContainerView: View {
                 .pickerStyle(.segmented)
                 .frame(width: 480)
             }
+
+            // 全局窗口最右上角指标状态胶囊
+            ToolbarItem(placement: .automatic) {
+                HStack(spacing: 8) {
+                    ParamCapsule(text: "UDP \(model.udpPort)", color: Theme.textSecondary)
+                        .help(model.t("VBAN 标准网络监听端口", "Standard VBAN network listening port"))
+
+                    ParamCapsule(
+                        text: "\(model.metrics.rxStreams.count) RX · \(model.txStreams.filter(\.enabled).count) TX",
+                        color: Theme.meterGreen
+                    )
+                    .help(model.t("当前在线活动的 VBAN 接收与发送流总数", "Total count of active incoming and outgoing streams"))
+                }
+            }
         }
     }
 }

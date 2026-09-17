@@ -6,69 +6,34 @@ struct StreamsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 固定高度顶栏 (40pt)
-            HStack(spacing: 8) {
-                Image(systemName: "waveform.badge.magnifyingglass")
-                    .font(.system(size: 14))
-                    .foregroundColor(Theme.neonCyan)
-                Text(model.t("网络音频流", "Network Streams"))
-                    .font(Theme.cnText(14, weight: .bold))
-                    .foregroundColor(Theme.textPrimary)
-                    .help(model.t("管理与监控本地所有 VBAN 网络音频接收与发送通道", "Manage and monitor all incoming and outgoing VBAN streams"))
-
-                Spacer()
-
-                // UDP 6980 和活跃流数量放到最右上角的位置
-                ParamCapsule(text: "UDP \(model.udpPort)", color: Theme.textSecondary)
-                    .help(model.t("VBAN 标准网络监听端口", "Standard VBAN network listening port"))
-
-                ParamCapsule(
-                    text: model.t(
-                        "活跃: \(model.metrics.rxStreams.count) 接收 · \(model.txStreams.filter(\.enabled).count) 发送",
-                        "Active: \(model.metrics.rxStreams.count) RX · \(model.txStreams.filter(\.enabled).count) TX"
-                    ),
-                    color: Theme.meterGreen
-                )
-                .help(model.t("当前在线活动的 VBAN 接收与发送流总数", "Total count of active incoming and outgoing streams"))
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 40)
-            .background(Color.white.opacity(0.03))
-
-            Divider().background(Theme.borderSubtle)
-
-            // 固定高度双列子顶栏 (30pt)
+            // 固定高度双列操作顶栏 (40pt)
             HStack(spacing: 0) {
-                // 左侧子表头：接收流 (RX)
+                // 左侧表头：接收流 (RX)
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.down.circle.fill")
-                        .font(.system(size: 13))
+                        .font(.system(size: 14))
                         .foregroundColor(Theme.neonCyan)
                     Text(model.t("接收流 (RX)", "Incoming Streams (RX)"))
-                        .font(Theme.cnText(12.5, weight: .bold))
+                        .font(Theme.cnText(14, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
                         .help(model.t("局域网内向本机传输的 VBAN 接收流", "Incoming audio streams received from the local network"))
 
                     Spacer()
-
-                    Text("\(model.metrics.rxStreams.count) " + model.t("路活动", "Active"))
-                        .font(Theme.monoDigit(11.5, weight: .semibold))
-                        .foregroundColor(Theme.textTertiary)
                 }
                 .padding(.horizontal, 16)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 Divider().background(Theme.borderSubtle)
 
-                // 右侧子表头：发送流 (TX)
+                // 右侧表头：发送流 (TX)
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 13))
+                        .font(.system(size: 14))
                         .foregroundColor(Theme.amberWarn)
                     Text(model.t("发送流 (TX)", "Outgoing Streams (TX)"))
-                        .font(Theme.cnText(12.5, weight: .bold))
+                        .font(Theme.cnText(14, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
-                        .help(model.t("从本机音频源（线缆/设备）采集并推向局域网的音频流", "Locally captured audio streams transmitted over the network"))
+                        .help(model.t("从本机音频源采集并推向局域网的音频流", "Locally captured audio streams transmitted over the network"))
 
                     Spacer()
 
@@ -77,10 +42,10 @@ struct StreamsView: View {
                             Image(systemName: "plus")
                                 .font(.system(size: 11, weight: .bold))
                             Text(model.t("新建发送流", "Add Stream"))
-                                .font(Theme.cnText(11.5, weight: .semibold))
+                                .font(Theme.cnText(12, weight: .semibold))
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
                         .background(Theme.neonCyan.opacity(0.18))
                         .foregroundColor(Theme.neonCyan)
                         .cornerRadius(4)
@@ -95,8 +60,8 @@ struct StreamsView: View {
                 .padding(.horizontal, 16)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(height: 30)
-            .background(Color.black.opacity(0.2))
+            .frame(height: 40)
+            .background(Color.white.opacity(0.03))
 
             Divider().background(Theme.borderSubtle)
 
