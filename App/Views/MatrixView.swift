@@ -325,9 +325,18 @@ struct MatrixCanvasView: View {
     @Binding var outputSlots: [MatrixSlot]
     var onOpenAddSheet: () -> Void
 
-    let cellSize: CGFloat = 100
-    let inLabelWidth: CGFloat = 210
-    let dashedThickness: CGFloat = 44
+    // 点阵网格基准尺寸
+    let dotStep: CGFloat = 24
+    let gridPadding: CGFloat = 48
+
+    let cellSlotSize: CGFloat = 96
+    let cellInnerSize: CGFloat = 92
+
+    let inSlotWidth: CGFloat = 216
+    let inInnerWidth: CGFloat = 212
+
+    let dashedSlotThickness: CGFloat = 48
+    let dashedInnerThickness: CGFloat = 44
 
     var body: some View {
         ScrollView([.horizontal, .vertical], showsIndicators: true) {
@@ -338,27 +347,27 @@ struct MatrixCanvasView: View {
 
                 // 核心矩阵网格
                 matrixGridWrapper
-                    .padding(36)
+                    .padding(gridPadding)
             }
         }
     }
 
     // 矩阵网格布局
     private var matrixGridWrapper: some View {
-        Grid(horizontalSpacing: 4, verticalSpacing: 4) {
+        Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             // 输出列标头
             GridRow {
                 // 左上角透明占位单元
                 Color.clear
-                    .frame(width: inLabelWidth, height: cellSize)
+                    .frame(width: inSlotWidth, height: cellSlotSize)
 
                 ForEach(Array(outputSlots.enumerated()), id: \.element.id) { colIdx, outSlot in
                     OutputEndpointHeader(
                         slot: outSlot,
                         colIndex: colIdx,
                         model: model,
-                        width: cellSize,
-                        height: cellSize,
+                        width: cellInnerSize,
+                        height: cellInnerSize,
                         onSelectEndpoint: { newId, newName, newType in
                             outputSlots[colIdx].endpointId = newId
                             outputSlots[colIdx].name = newName
@@ -368,16 +377,18 @@ struct MatrixCanvasView: View {
                             deleteOutputSlot(at: colIdx)
                         }
                     )
+                    .frame(width: cellSlotSize, height: cellSlotSize)
                 }
 
                 MatrixDashedPlusCell(
-                    width: dashedThickness,
-                    height: cellSize,
+                    width: dashedInnerThickness,
+                    height: cellInnerSize,
                     label: "+",
                     tooltip: model.t("在右侧添加输出通道", "Add Output Channel at right")
                 ) {
                     appendOutputSlot()
                 }
+                .frame(width: dashedSlotThickness, height: cellSlotSize)
             }
 
             // 输入行与交叉连接单元
@@ -387,8 +398,8 @@ struct MatrixCanvasView: View {
                         slot: inSlot,
                         rowIndex: rowIdx,
                         model: model,
-                        width: inLabelWidth,
-                        height: cellSize,
+                        width: inInnerWidth,
+                        height: cellInnerSize,
                         onSelectEndpoint: { newId, newName, newType in
                             inputSlots[rowIdx].endpointId = newId
                             inputSlots[rowIdx].name = newName
@@ -398,58 +409,64 @@ struct MatrixCanvasView: View {
                             deleteInputSlot(at: rowIdx)
                         }
                     )
+                    .frame(width: inSlotWidth, height: cellSlotSize)
 
                     ForEach(Array(outputSlots.enumerated()), id: \.element.id) { _, outSlot in
                         CrossPointCell(
                             model: model,
                             inSlot: inSlot,
                             outSlot: outSlot,
-                            size: cellSize,
+                            size: cellInnerSize,
                             onOpenAddSheet: onOpenAddSheet
                         )
+                        .frame(width: cellSlotSize, height: cellSlotSize)
                     }
 
                     MatrixDashedPlusCell(
-                        width: dashedThickness,
-                        height: cellSize,
+                        width: dashedInnerThickness,
+                        height: cellInnerSize,
                         label: "+",
                         tooltip: model.t("向右扩展输出通道", "Expand output channel")
                     ) {
                         appendOutputSlot()
                     }
+                    .frame(width: dashedSlotThickness, height: cellSlotSize)
                 }
             }
 
             // 底部外围虚线槽位
             GridRow {
                 MatrixDashedPlusCell(
-                    width: inLabelWidth,
-                    height: dashedThickness,
+                    width: inInnerWidth,
+                    height: dashedInnerThickness,
                     label: "+",
                     tooltip: model.t("添加输入通道", "Add input channel")
                 ) {
                     appendInputSlot()
                 }
+                .frame(width: inSlotWidth, height: dashedSlotThickness)
 
                 ForEach(0..<outputSlots.count, id: \.self) { _ in
                     MatrixDashedPlusCell(
-                        width: cellSize,
-                        height: dashedThickness,
+                        width: cellInnerSize,
+                        height: dashedInnerThickness,
                         label: "+",
                         tooltip: model.t("向下扩充输入通道", "Expand input channel")
                     ) {
                         appendInputSlot()
                     }
+                    .frame(width: cellSlotSize, height: dashedSlotThickness)
                 }
 
                 MatrixDashedPlusCell(
-                    width: dashedThickness,
-                    height: dashedThickness,
+                    width: dashedInnerThickness,
+                    height: dashedInnerThickness,
                     label: "+",
                     tooltip: model.t("新建路由规则", "Add Route")
                 ) {
                     onOpenAddSheet()
                 }
+                .frame(width: dashedSlotThickness, height: dashedSlotThickness)
             }
         }
     }
@@ -846,15 +863,16 @@ struct CrossPointCell: View {
 // 点阵背景组件
 // -------------------------------------------------------------
 struct InfiniteDotGridCanvas: View {
+    let step: CGFloat = 24
+
     var body: some View {
         Canvas { context, size in
-            let step: CGFloat = 30
-            var x: CGFloat = 15
+            var x: CGFloat = 12
             while x < size.width {
-                var y: CGFloat = 15
+                var y: CGFloat = 12
                 while y < size.height {
                     let rect = CGRect(x: x - 1, y: y - 1, width: 2, height: 2)
-                    context.fill(Path(ellipseIn: rect), with: .color(Color.white.opacity(0.09)))
+                    context.fill(Path(ellipseIn: rect), with: .color(Color.white.opacity(0.18)))
                     y += step
                 }
                 x += step
