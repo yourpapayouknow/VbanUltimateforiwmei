@@ -11,12 +11,11 @@ echo "Building VBAN Ultimate macOS Application..."
 mkdir -p "$MACOS_DIR"
 mkdir -p "$PROJECT_DIR/bin"
 
-# 1. 编译 Objective-C++ 桥接目标文件 (若未生成)
-if [ ! -f "$PROJECT_DIR/bin/BridgeCore.o" ]; then
-    echo "Compiling BridgeCore.mm..."
-    clang++ -std=c++20 -x objective-c++ -c "$PROJECT_DIR/Bridge/BridgeCore.mm" \
-        -o "$PROJECT_DIR/bin/BridgeCore.o" -Wall -Wextra -fobjc-arc
-fi
+# 1. 编译 Objective-C++ 桥接目标文件
+echo "Compiling BridgeCore.mm..."
+clang++ -std=c++20 -x objective-c++ -c "$PROJECT_DIR/Bridge/BridgeCore.mm" \
+    -target arm64-apple-macos13.0 \
+    -o "$PROJECT_DIR/bin/BridgeCore.o" -Wall -Wextra -fobjc-arc
 
 # 2. 生成 App Info.plist
 cat << 'EOF' > "$APP_DIR/Contents/Info.plist"

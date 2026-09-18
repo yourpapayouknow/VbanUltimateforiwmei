@@ -32,6 +32,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) uint64_t totalLost;
 @property (nonatomic, assign) BOOL audioRunning;
 @property (nonatomic, assign) BOOL driverInstalled;
+@property (nonatomic, assign) BOOL portConflict;
+@property (nonatomic, assign) uint16_t boundPort;
 @property (nonatomic, strong) NSArray<VbanStrmMetric *> *rxStreams;
 @end
 
@@ -73,9 +75,12 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (instancetype)shared;
 
-// 启动与停止后台网络与音频引擎
+// 启动与停止后台网络与音频引擎（支持指定端口，严格报错不降级）
 - (BOOL)startAll;
+- (BOOL)startAllWithPort:(uint16_t)port;
 - (void)stopAll;
+- (BOOL)isPortConflict;
+- (uint16_t)boundPort;
 
 // 虚拟音频线缆管理
 - (NSArray<VbanCableDesc *> *)getCables;

@@ -37,6 +37,8 @@
     std::thread                       rx_th_;
     std::atomic<bool>                 th_run_;
     std::atomic<bool>                 is_run_;
+    std::atomic<bool>                 port_conflict_;
+    std::atomic<uint16_t>             bound_port_;
 }
 @end
 
@@ -56,13 +58,15 @@
     // 初始化桥接并装载C++核心引擎
     self = [super init];
     if (self) {
-        sck_    = std::make_shared<vban::UdpSck>();
-        dmx_    = std::make_shared<vban::StrmDmx>();
-        cbl_    = std::make_shared<vban::CblMgr>();
-        rtr_    = std::make_shared<vban::MtrxRtr>();
-        mtr_    = std::make_shared<vban::MtrcsEngn>(dmx_, cbl_, rtr_);
-        th_run_ = false;
-        is_run_ = false;
+        sck_           = std::make_shared<vban::UdpSck>();
+        dmx_           = std::make_shared<vban::StrmDmx>();
+        cbl_           = std::make_shared<vban::CblMgr>();
+        rtr_           = std::make_shared<vban::MtrxRtr>();
+        mtr_           = std::make_shared<vban::MtrcsEngn>(dmx_, cbl_, rtr_);
+        th_run_        = false;
+        is_run_        = false;
+        port_conflict_ = false;
+        bound_port_    = 6980;
     }
     return self;
 }
@@ -72,18 +76,28 @@
 }
 
 - (BOOL)startAll {
-    // 启动非阻塞网络监听与工作线程
-    if (is_run_.load()) return YES;
+    return [self startAllWithPort:6980];
+}
+
+- (BOOL)startAllWithPort:(uint16_t)port {
+    // 启动指定端口监听：严格不降级换绑，若冲突则记录并提醒
+    if (is_run_.load()) {
+        if (bound_port_.load() == port && !port_conflict_.load()) return YES;
+        [self stopAll];
+    }
+
+    port_conflict_.store(false);
+    bound_port_.store(port);
 
     if (!sck_->initsck()) {
         return NO;
     }
 
-    // 默认绑定 VBAN 官方 6980 端口 (若被占用则尝试备用端口)
-    if (!sck_->bndsck(6980)) {
-        if (!sck_->bndsck(16980)) {
-            return NO;
-        }
+    // 绑定端口：若被占用绝不降级换绑，明确记录冲突
+    if (!sck_->bndsck(port)) {
+        port_conflict_.store(true);
+        sck_->clssck();
+        return NO;
     }
 
     th_run_.store(true);
@@ -108,6 +122,14 @@
     });
 
     return YES;
+}
+
+- (BOOL)isPortConflict {
+    return port_conflict_.load();
+}
+
+- (uint16_t)boundPort {
+    return bound_port_.load();
 }
 
 - (void)stopAll {
@@ -219,6 +241,8 @@
     m.totalLost       = snap.totl_lost;
     m.audioRunning    = snap.aud_run;
     m.driverInstalled = snap.drv_ok;
+    m.portConflict    = port_conflict_.load();
+    m.boundPort       = bound_port_.load();
 
     NSMutableArray<VbanStrmMetric *> *strms = [NSMutableArray array];
     for (const auto& s : snap.rx_snaps) {

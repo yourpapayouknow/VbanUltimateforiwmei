@@ -39,12 +39,17 @@ struct MainContainerView: View {
             // 全局窗口最右上角指标状态胶囊
             ToolbarItem(placement: .automatic) {
                 HStack(spacing: 8) {
-                    ParamCapsule(text: "UDP \(model.udpPort)", color: Theme.textSecondary)
-                        .help(model.t("VBAN 标准网络监听端口", "Standard VBAN network listening port"))
+                    if model.isPortConflict {
+                        ParamCapsule(text: "UDP \(model.udpPort) " + model.t("冲突占用", "Conflict"), color: Theme.alertRed)
+                            .help(model.t("UDP \(model.udpPort) 端口被其他应用（如 VBAN Talkie）独占，无法接收外部音频流", "UDP port \(model.udpPort) is occupied by another app. Cannot receive streams."))
+                    } else {
+                        ParamCapsule(text: "UDP \(model.udpPort)", color: Theme.textSecondary)
+                            .help(model.t("VBAN 标准网络监听端口", "Standard VBAN network listening port"))
+                    }
 
                     ParamCapsule(
                         text: "\(model.metrics.rxStreams.count) RX · \(model.txStreams.filter(\.enabled).count) TX",
-                        color: Theme.meterGreen
+                        color: model.metrics.rxStreams.isEmpty && model.txStreams.filter(\.enabled).isEmpty ? Theme.textTertiary : Theme.meterGreen
                     )
                     .help(model.t("当前在线活动的 VBAN 接收与发送流总数", "Total count of active incoming and outgoing streams"))
                 }

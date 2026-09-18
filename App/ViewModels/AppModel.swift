@@ -92,6 +92,7 @@ final class AppModel: ObservableObject {
         }
     }
     @Published var isAudioRunning: Bool = false
+    @Published var isPortConflict: Bool = false
     @Published var udpPort: String = "6980"
 
     private var timer: Timer?
@@ -107,8 +108,9 @@ final class AppModel: ObservableObject {
     }
 
     func start() {
-        // 启动底层工作引擎并载入初态
-        _ = bridge.startAll()
+        // 启动底层工作引擎并载入初态 (绑定指定端口，若冲突则严格报错不降级)
+        let p = UInt16(udpPort) ?? 6980
+        _ = bridge.startAll(withPort: p)
         isAudioRunning = true
         refreshAll()
 
@@ -125,6 +127,12 @@ final class AppModel: ObservableObject {
         isAudioRunning = false
     }
 
+    func retryBindPort() {
+        let p = UInt16(udpPort) ?? 6980
+        _ = bridge.startAll(withPort: p)
+        pollMetrics()
+    }
+
     func refreshAll() {
         cables = bridge.getCables()
         devices = bridge.getDevices()
@@ -135,6 +143,7 @@ final class AppModel: ObservableObject {
     func pollMetrics() {
         metrics = bridge.getSnapshot()
         metrics.activeTx = UInt32(txStreams.filter(\.enabled).count)
+        isPortConflict = metrics.portConflict
     }
 
     // 发送流管理

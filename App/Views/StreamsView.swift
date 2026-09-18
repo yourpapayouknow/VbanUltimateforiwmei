@@ -61,7 +61,46 @@ struct StreamsView: View {
             HStack(spacing: 0) {
                 // 左列：接收流 (RX)
                 VStack(spacing: 0) {
-                    if model.metrics.rxStreams.isEmpty {
+                    if model.isPortConflict {
+                        VStack(spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 30))
+                                .foregroundColor(Theme.alertRed)
+
+                            Text(model.t("UDP 端口 \(model.udpPort) 被占用", "UDP Port \(model.udpPort) In Use"))
+                                .font(Theme.cnText(15, weight: .bold))
+                                .foregroundColor(Theme.textPrimary)
+
+                            Text(model.t("检测到 UDP \(model.udpPort) 已被其他应用（如 VBAN Talkie）独占。\n遵循规则未做降级换绑，当前无法接收外部音频流。", "Port \(model.udpPort) is occupied by another app (e.g. VBAN Talkie).\nNo port fallback performed; currently cannot receive streams."))
+                                .font(Theme.cnText(12.5, weight: .medium))
+                                .foregroundColor(Theme.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 20)
+
+                            Button(action: {
+                                model.retryBindPort()
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text(model.t("退出冲突应用后点击重试", "Retry Binding Port"))
+                                }
+                                .font(Theme.cnText(12.5, weight: .semibold))
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Theme.amberWarn)
+                            .padding(.top, 4)
+                        }
+                        .padding(.vertical, 28)
+                        .padding(.horizontal, 16)
+                        .background(Color.white.opacity(0.025))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Theme.alertRed.opacity(0.4), lineWidth: 1)
+                        )
+                        .padding(16)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if model.metrics.rxStreams.isEmpty {
                         VStack(spacing: 8) {
                             Image(systemName: "waveform.badge.magnifyingglass")
                                 .font(.system(size: 26))
@@ -71,7 +110,7 @@ struct StreamsView: View {
                                 .foregroundColor(Theme.textTertiary)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .help(model.t("局域网设备向本机 UDP 6980 发送音频包时将自动显示在此", "Streams sent to UDP 6980 will appear here automatically"))
+                        .help(model.t("局域网设备向本机 UDP \(model.udpPort) 发送音频包时将自动显示在此", "Streams sent to UDP \(model.udpPort) will appear here automatically"))
                     } else {
                         ScrollView {
                             LazyVStack(spacing: 10) {
