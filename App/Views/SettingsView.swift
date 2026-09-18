@@ -131,14 +131,9 @@ struct SettingsView: View {
 
             // 主机网络地址行
             HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(model.t("主机网络地址", "IP Host Address"))
-                        .font(Theme.cnText(13, weight: .semibold))
-                        .foregroundColor(Theme.textPrimary)
-                    Text(model.t("本机局域网通信地址", "Local Host LAN Address"))
-                        .font(Theme.cnText(10.5, weight: .regular))
-                        .foregroundColor(Theme.textTertiary)
-                }
+                Text(model.t("主机网络地址", "IP Host Address"))
+                    .font(Theme.cnText(13, weight: .semibold))
+                    .foregroundColor(Theme.textPrimary)
 
                 Spacer()
 
@@ -176,14 +171,9 @@ struct SettingsView: View {
 
             // 监听端口行
             HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(model.t("网络监听端口", "VBAN Port"))
-                        .font(Theme.cnText(13, weight: .semibold))
-                        .foregroundColor(Theme.textPrimary)
-                    Text(model.t("网络音频数据包监听端口", "UDP Listening Port"))
-                        .font(Theme.cnText(10.5, weight: .regular))
-                        .foregroundColor(Theme.textTertiary)
-                }
+                Text(model.t("网络监听端口", "VBAN Port"))
+                    .font(Theme.cnText(13, weight: .semibold))
+                    .foregroundColor(Theme.textPrimary)
 
                 Spacer()
 
@@ -200,14 +190,9 @@ struct SettingsView: View {
 
             // 用户节点名称行
             HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(model.t("用户节点标识", "Username"))
-                        .font(Theme.cnText(13, weight: .semibold))
-                        .foregroundColor(Theme.textPrimary)
-                    Text(model.t("电台呼号与发送流标识，不超过十六字符", "Station ID & Stream Label, up to 16 chars"))
-                        .font(Theme.cnText(10.5, weight: .regular))
-                        .foregroundColor(Theme.textTertiary)
-                }
+                Text(model.t("用户节点标识", "Username"))
+                    .font(Theme.cnText(13, weight: .semibold))
+                    .foregroundColor(Theme.textPrimary)
 
                 Spacer()
 
@@ -222,14 +207,9 @@ struct SettingsView: View {
 
             // 网络质量策略行
             HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(model.t("网络传输质量", "Network Quality"))
-                        .font(Theme.cnText(13, weight: .semibold))
-                        .foregroundColor(Theme.textPrimary)
-                    Text(model.networkQuality.desc(for: model.language))
-                        .font(Theme.cnText(10.5, weight: .regular))
-                        .foregroundColor(Theme.textTertiary)
-                }
+                Text(model.t("网络传输质量", "Network Quality"))
+                    .font(Theme.cnText(13, weight: .semibold))
+                    .foregroundColor(Theme.textPrimary)
 
                 Spacer()
 
@@ -241,20 +221,15 @@ struct SettingsView: View {
                 .pickerStyle(.menu)
                 .frame(width: 110)
             }
-            .help(model.t("网络质量与抗网络抖动平滑缓冲预设。提供极致、快速、中等、慢速、极慢五档策略，动态调整接收端缓冲深度。", "Network quality and jitter buffer depth presets, offering Optimal, Fast, Medium, Slow, and Very slow modes to adaptively adjust reception buffer."))
+            .help(model.t("网络传输质量预设：\(model.networkQuality.desc(for: model.language))。动态调整抗抖动平滑缓冲深度，避免网络丢包产生爆音。", "Network transmission quality preset: \(model.networkQuality.desc(for: model.language)). Dynamically adjusts jitter buffer depth to prevent underruns."))
 
             Divider().background(Color.white.opacity(0.04))
 
             // 音频缓冲大小行
             HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(model.t("音频缓冲大小", "Buffering"))
-                        .font(Theme.cnText(13, weight: .semibold))
-                        .foregroundColor(Theme.textPrimary)
-                    Text(model.bufferingDesc(model.bufferingFrames))
-                        .font(Theme.cnText(10.5, weight: .regular))
-                        .foregroundColor(Theme.textTertiary)
-                }
+                Text(model.t("音频缓冲大小", "Buffering"))
+                    .font(Theme.cnText(13, weight: .semibold))
+                    .foregroundColor(Theme.textPrimary)
 
                 Spacer()
 
@@ -266,7 +241,7 @@ struct SettingsView: View {
                 .pickerStyle(.menu)
                 .frame(width: 110)
             }
-            .help(model.t("音频调度与网络发包缓冲样本数。包含标称十毫秒封包帧长与经典低延迟音频调度块大小。", "Audio scheduling and packet payload sample frames, covering nominal 10ms packet frames and classic low-latency audio blocks."))
+            .help(model.t("音频缓冲调度大小：\(model.bufferingDesc(model.bufferingFrames))。包含标称十毫秒封包帧长与低延迟音频调度块大小。", "Audio buffer scheduling size: \(model.bufferingDesc(model.bufferingFrames)). Covers nominal 10ms packet frames and low-latency audio blocks."))
         }
     }
 
@@ -554,21 +529,14 @@ struct SettingsView: View {
     // 鸣谢列表行
     private func creditRow(name: String, author: String, desc: String, urlString: String) -> some View {
         HStack(alignment: .center, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(name)
-                        .font(Theme.monoDigit(11.5, weight: .bold))
-                        .foregroundColor(Theme.textPrimary)
+            HStack(spacing: 6) {
+                Text(name)
+                    .font(Theme.monoDigit(12, weight: .bold))
+                    .foregroundColor(Theme.textPrimary)
 
-                    Text("• \(author)")
-                        .font(Theme.cnText(11, weight: .medium))
-                        .foregroundColor(Theme.textTertiary)
-                }
-
-                Text(desc)
-                    .font(Theme.cnText(10.5, weight: .regular))
-                    .foregroundColor(Theme.textTertiary.opacity(0.85))
-                    .lineLimit(1)
+                Text("• \(author)")
+                    .font(Theme.cnText(11.5, weight: .medium))
+                    .foregroundColor(Theme.textTertiary)
             }
 
             Spacer()
@@ -579,7 +547,7 @@ struct SettingsView: View {
                 }
             }) {
                 Text(model.t("访问", "Visit"))
-                    .font(Theme.cnText(10, weight: .semibold))
+                    .font(Theme.cnText(10.5, weight: .semibold))
                     .padding(.horizontal, 7)
                     .padding(.vertical, 2.5)
                     .background(Color.white.opacity(0.04))
@@ -587,20 +555,21 @@ struct SettingsView: View {
                     .cornerRadius(3)
                     .overlay(
                         RoundedRectangle(cornerRadius: 3)
-                            .stroke(Theme.neonCyan.opacity(0.3), lineWidth: 1)
+                            .stroke(Theme.neonCyan.opacity(0.85), lineWidth: 1.2)
                     )
             }
             .buttonStyle(.plain)
             .help(urlString)
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
         .background(Color.white.opacity(0.015))
         .cornerRadius(4)
         .overlay(
             RoundedRectangle(cornerRadius: 4)
                 .stroke(Color.white.opacity(0.04), lineWidth: 1)
         )
+        .help("\(name) • \(author)\n\(desc)")
     }
 
     // 版权与外链支持
@@ -609,20 +578,17 @@ struct SettingsView: View {
             Text("© 2026 iwmei. All rights reserved.")
                 .font(Theme.cnText(11.5, weight: .medium))
                 .foregroundColor(Theme.textTertiary)
-
-            Text(model.t(
-                "遵循 VBAN 协议开源准则与 Apple CoreAudio HAL 驱动规范",
-                "Compliant with VBAN protocol specifications and Apple CoreAudio HAL standards."
-            ))
-            .font(Theme.cnText(10.5, weight: .regular))
-            .foregroundColor(Theme.textTertiary.opacity(0.85))
+                .help(model.t(
+                    "遵循 VBAN 协议开源准则与 Apple CoreAudio HAL 驱动规范",
+                    "Compliant with VBAN protocol specifications and Apple CoreAudio HAL standards."
+                ))
 
             HStack(spacing: 8) {
                 linkButton(title: model.t("技术文档", "Docs"), urlString: "https://github.com/iwmei/vbanultimate#readme")
                 linkButton(title: model.t("开源仓库", "GitHub"), urlString: "https://github.com/iwmei/vbanultimate")
                 linkButton(title: model.t("反馈支持", "Feedback"), urlString: "https://github.com/iwmei/vbanultimate/issues")
             }
-            .padding(.top, 4)
+            .padding(.top, 2)
         }
     }
 
