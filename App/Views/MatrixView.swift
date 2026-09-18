@@ -8,7 +8,7 @@ enum MatrixViewMode: String, CaseIterable {
 
 // 矩阵槽位端点描述
 struct MatrixSlot: Identifiable, Equatable {
-    let id: UUID = UUID()
+    var id: String
     var endpointId: String
     var name: String
     var typeDesc: String
@@ -21,7 +21,7 @@ struct MatrixView: View {
     @State private var viewMode: MatrixViewMode = .list
     @State private var showAddRouteSheet = false
 
-    // 默认 4x4 矩阵的输入端点行（左侧输入）与输出端点列（上侧输出）
+    // 矩阵输入输出槽位
     @State private var inputSlots: [MatrixSlot] = []
     @State private var outputSlots: [MatrixSlot] = []
     @State private var isInitialized = false
@@ -55,15 +55,15 @@ struct MatrixView: View {
         }
     }
 
-    // 顶部操作工具栏 (固定 40pt)
+    // 顶部操作工具栏
     private var topToolbar: some View {
         HStack(spacing: 12) {
-            // 方形胶囊视图切换器 (替代多余的“路由矩阵”静态文字)
+            // 方形胶囊视图切换器
             viewModeCapsule
 
             Spacer()
 
-            // 与“音频流”页统一规范的“建立路由”弹出页按钮
+            // 建立路由按钮
             addRouteButton
         }
         .padding(.horizontal, 16)
@@ -154,31 +154,31 @@ struct MatrixView: View {
         .help(model.t("新建输入源到输出目标的交叉连接路由", "Configure and add a new routing connection"))
     }
 
-    // 初始化默认 4x4 矩阵槽位（左侧输入，上侧输出）
+    // 初始化矩阵槽位
     private func initSlots() {
         var availableInputs: [MatrixSlot] = []
         for dev in model.devices.filter({ $0.inChannels > 0 }) {
-            availableInputs.append(MatrixSlot(endpointId: dev.uid, name: dev.name, typeDesc: model.t("物理输入", "Device In"), iconName: "mic.fill"))
+            availableInputs.append(MatrixSlot(id: "dev_in_\(dev.uid)", endpointId: dev.uid, name: dev.name, typeDesc: model.t("物理输入", "Device In"), iconName: "mic.fill"))
         }
         for cable in model.cables {
-            availableInputs.append(MatrixSlot(endpointId: cable.cableId, name: cable.name, typeDesc: model.t("线缆输出", "Cable Out"), iconName: "cable.connector"))
+            availableInputs.append(MatrixSlot(id: "cable_out_\(cable.cableId)", endpointId: cable.cableId, name: cable.name, typeDesc: model.t("线缆输出", "Cable Out"), iconName: "cable.connector"))
         }
-        for strm in model.metrics.rxStreams {
-            availableInputs.append(MatrixSlot(endpointId: strm.name, name: "VBAN [\(strm.name)]", typeDesc: model.t("网络流", "VBAN RX"), iconName: "waveform"))
+        for s in model.metrics.rxStreams {
+            availableInputs.append(MatrixSlot(id: "rx_\(s.name)", endpointId: s.name, name: "VBAN [\(s.name)]", typeDesc: model.t("网络流", "VBAN RX"), iconName: "waveform"))
         }
 
         var availableOutputs: [MatrixSlot] = []
         for dev in model.devices.filter({ $0.outChannels > 0 }) {
-            availableOutputs.append(MatrixSlot(endpointId: dev.uid, name: dev.name, typeDesc: model.t("物理输出", "Device Out"), iconName: "speaker.wave.2.fill"))
+            availableOutputs.append(MatrixSlot(id: "dev_out_\(dev.uid)", endpointId: dev.uid, name: dev.name, typeDesc: model.t("物理输出", "Device Out"), iconName: "speaker.wave.2.fill"))
         }
         for cable in model.cables {
-            availableOutputs.append(MatrixSlot(endpointId: cable.cableId, name: cable.name, typeDesc: model.t("线缆输入", "Cable In"), iconName: "cable.connector"))
+            availableOutputs.append(MatrixSlot(id: "cable_in_\(cable.cableId)", endpointId: cable.cableId, name: cable.name, typeDesc: model.t("线缆输入", "Cable In"), iconName: "cable.connector"))
         }
 
         var ins = Array(availableInputs.prefix(4))
         var inIndex = ins.count + 1
         while ins.count < 4 {
-            ins.append(MatrixSlot(endpointId: "", name: model.t("输入通道 \(inIndex)", "Input \(inIndex)"), typeDesc: model.t("未配置", "Unassigned"), iconName: "arrow.down.right.and.arrow.up.left"))
+            ins.append(MatrixSlot(id: "slot_in_\(inIndex)", endpointId: "", name: model.t("输入 \(inIndex)", "Input \(inIndex)"), typeDesc: model.t("未配置", "Unassigned"), iconName: "arrow.down.right.and.arrow.up.left"))
             inIndex += 1
         }
         self.inputSlots = ins
@@ -186,7 +186,7 @@ struct MatrixView: View {
         var outs = Array(availableOutputs.prefix(4))
         var outIndex = outs.count + 1
         while outs.count < 4 {
-            outs.append(MatrixSlot(endpointId: "", name: model.t("输出通道 \(outIndex)", "Output \(outIndex)"), typeDesc: model.t("未配置", "Unassigned"), iconName: "arrow.up.right.and.arrow.down.left"))
+            outs.append(MatrixSlot(id: "slot_out_\(outIndex)", endpointId: "", name: model.t("输出 \(outIndex)", "Output \(outIndex)"), typeDesc: model.t("未配置", "Unassigned"), iconName: "arrow.up.right.and.arrow.down.left"))
             outIndex += 1
         }
         self.outputSlots = outs
@@ -194,7 +194,7 @@ struct MatrixView: View {
 }
 
 // -------------------------------------------------------------
-// 列表型视图 (MatrixListView)
+// 路由列表视图
 // -------------------------------------------------------------
 struct MatrixListView: View {
     @ObservedObject var model: AppModel
@@ -217,11 +217,11 @@ struct MatrixListView: View {
         HStack(spacing: 12) {
             Text(model.t("状态", "Status"))
                 .frame(width: 44, alignment: .center)
-            Text(model.t("输入源 (左)", "Source (In)"))
+            Text(model.t("输入源", "Source"))
                 .frame(width: 210, alignment: .leading)
             Text("")
                 .frame(width: 20, alignment: .center)
-            Text(model.t("输出目标 (上)", "Destination (Out)"))
+            Text(model.t("输出目标", "Destination"))
                 .frame(width: 210, alignment: .leading)
             Text(model.t("路由增益", "Gain"))
                 .frame(width: 140, alignment: .center)
@@ -244,13 +244,11 @@ struct MatrixListView: View {
                 .font(.system(size: 28))
                 .foregroundColor(Theme.textTertiary)
             Text(model.t("无活动路由连接", "No Active Routes"))
-                .font(Theme.cnText(14, weight: .semibold))
+                .font(Theme.cnText(13.5, weight: .semibold))
                 .foregroundColor(Theme.textTertiary)
-            Text(model.t("点击右上角 [+ 建立路由] 或切换至矩阵型画布即可直观连接通道", "Click [+ Add Route] or switch to Matrix view to connect channels"))
-                .font(Theme.cnText(12, weight: .regular))
-                .foregroundColor(Theme.textTertiary.opacity(0.8))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .help(model.t("点击右上角 [+ 建立路由] 或切换至矩阵视图建立通道连接", "Click [+ Add Route] or switch to Matrix view to connect channels"))
     }
 
     private var routesScrollView: some View {
@@ -330,7 +328,7 @@ struct MatrixListView: View {
 }
 
 // -------------------------------------------------------------
-// 矩阵型视图 (MatrixCanvasView) - 无限画布 + 默认4x4 + 外围一圈虚线“+”号方格
+// 矩阵画布视图
 // -------------------------------------------------------------
 struct MatrixCanvasView: View {
     @ObservedObject var model: AppModel
@@ -338,71 +336,181 @@ struct MatrixCanvasView: View {
     @Binding var outputSlots: [MatrixSlot]
     var onOpenAddSheet: () -> Void
 
-    private let cellSize: CGFloat = 68
-    private let inLabelWidth: CGFloat = 148
-    private let outLabelHeight: CGFloat = 76
-    private let dashedBorderThickness: CGFloat = 46
+    let cellSize: CGFloat = 72
+    let inLabelWidth: CGFloat = 144
+    let dashedThickness: CGFloat = 46
 
     var body: some View {
         ScrollView([.horizontal, .vertical], showsIndicators: true) {
             ZStack(alignment: .topLeading) {
-                // 视觉上无限延伸的点阵画布背景
+                // 点阵画布背景
                 InfiniteDotGridCanvas()
                     .frame(minWidth: 1600, minHeight: 1200)
 
-                VStack(alignment: .leading, spacing: 14) {
-                    guideBanner
-
-                    matrixGridWrapper
-                }
-                .padding(32)
+                // 核心矩阵网格
+                matrixGridWrapper
+                    .padding(36)
             }
         }
     }
 
-    private var guideBanner: some View {
-        HStack(spacing: 12) {
-            HStack(spacing: 6) {
-                Circle().fill(Theme.neonCyan).frame(width: 7, height: 7)
-                Text(model.t("左侧行：输入源 (Inputs)", "Left Rows: Source Inputs"))
-                    .font(Theme.cnText(12, weight: .semibold))
-                    .foregroundColor(Theme.textSecondary)
-            }
-            Text("•").foregroundColor(Theme.textTertiary)
-            HStack(spacing: 6) {
-                Circle().fill(Theme.amberWarn).frame(width: 7, height: 7)
-                Text(model.t("上侧列：输出目标 (Outputs)", "Top Columns: Destination Outputs"))
-                    .font(Theme.cnText(12, weight: .semibold))
-                    .foregroundColor(Theme.textSecondary)
-            }
-            Text("•").foregroundColor(Theme.textTertiary)
-            Text(model.t("点击外围虚线 [+] 方格即可拓展通道，点击交叉方格一键建立/断开连线", "Click perimeter dashed [+] to expand, click cross-point to connect/disconnect"))
-                .font(Theme.cnText(11.5, weight: .regular))
-                .foregroundColor(Theme.textTertiary)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-        .background(Color.white.opacity(0.025))
-        .cornerRadius(6)
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
-        )
-    }
-
+    // 矩阵网格布局
     private var matrixGridWrapper: some View {
-        HStack(alignment: .top, spacing: 0) {
-            // 1. 最左侧外围一列虚线方格
-            leftDashedColumn
+        Grid(horizontalSpacing: 4, verticalSpacing: 4) {
+            // 顶部外围虚线槽位
+            GridRow {
+                Color.clear
+                    .gridCellColumns(1)
+                    .frame(width: dashedThickness, height: dashedThickness)
 
-            // 2. 主体：上外圈虚线行 + 列标头 + 交叉行 + 下外圈虚线行
-            centerMatrixBody
+                Color.clear
+                    .gridCellColumns(1)
+                    .frame(width: inLabelWidth, height: dashedThickness)
 
-            // 3. 最右侧外围一列虚线方格
-            rightDashedColumn
+                ForEach(0..<outputSlots.count, id: \.self) { cIdx in
+                    MatrixDashedPlusCell(
+                        width: cellSize,
+                        height: dashedThickness,
+                        label: "+",
+                        tooltip: model.t("在第 \(cIdx + 1) 列插入输出通道", "Insert Output Channel at column \(cIdx + 1)")
+                    ) {
+                        insertOutputSlot(at: cIdx)
+                    }
+                }
+
+                Color.clear
+                    .gridCellColumns(1)
+                    .frame(width: dashedThickness, height: dashedThickness)
+            }
+
+            // 输出列标头
+            GridRow {
+                MatrixDashedPlusCell(
+                    width: dashedThickness,
+                    height: cellSize,
+                    label: "+",
+                    tooltip: model.t("新建音频路由", "Add Route")
+                ) {
+                    onOpenAddSheet()
+                }
+
+                // 坐标指示单元
+                cornerIndicator
+
+                ForEach(Array(outputSlots.enumerated()), id: \.element.id) { colIdx, outSlot in
+                    OutputEndpointHeader(
+                        slot: outSlot,
+                        colIndex: colIdx,
+                        model: model,
+                        width: cellSize,
+                        height: cellSize,
+                        onSelectEndpoint: { newId, newName, newType in
+                            outputSlots[colIdx].endpointId = newId
+                            outputSlots[colIdx].name = newName
+                            outputSlots[colIdx].typeDesc = newType
+                        }
+                    )
+                }
+
+                MatrixDashedPlusCell(
+                    width: dashedThickness,
+                    height: cellSize,
+                    label: "+",
+                    tooltip: model.t("在右侧添加输出通道", "Add Output Channel at right")
+                ) {
+                    appendOutputSlot()
+                }
+            }
+
+            // 输入行与交叉连接单元
+            ForEach(Array(inputSlots.enumerated()), id: \.element.id) { rowIdx, inSlot in
+                GridRow {
+                    MatrixDashedPlusCell(
+                        width: dashedThickness,
+                        height: cellSize,
+                        label: "+",
+                        tooltip: model.t("在第 \(rowIdx + 1) 行插入输入通道", "Insert Input Channel at row \(rowIdx + 1)")
+                    ) {
+                        insertInputSlot(at: rowIdx)
+                    }
+
+                    InputEndpointHeader(
+                        slot: inSlot,
+                        rowIndex: rowIdx,
+                        model: model,
+                        width: inLabelWidth,
+                        height: cellSize,
+                        onSelectEndpoint: { newId, newName, newType in
+                            inputSlots[rowIdx].endpointId = newId
+                            inputSlots[rowIdx].name = newName
+                            inputSlots[rowIdx].typeDesc = newType
+                        }
+                    )
+
+                    ForEach(Array(outputSlots.enumerated()), id: \.element.id) { _, outSlot in
+                        CrossPointCell(
+                            model: model,
+                            inSlot: inSlot,
+                            outSlot: outSlot,
+                            size: cellSize,
+                            onOpenAddSheet: onOpenAddSheet
+                        )
+                    }
+
+                    MatrixDashedPlusCell(
+                        width: dashedThickness,
+                        height: cellSize,
+                        label: "+",
+                        tooltip: model.t("向右扩展输出通道", "Expand output channel")
+                    ) {
+                        appendOutputSlot()
+                    }
+                }
+            }
+
+            // 底部外围虚线槽位
+            GridRow {
+                MatrixDashedPlusCell(
+                    width: dashedThickness,
+                    height: dashedThickness,
+                    label: "+",
+                    tooltip: model.t("添加输入通道", "Add Input")
+                ) {
+                    appendInputSlot()
+                }
+
+                MatrixDashedPlusCell(
+                    width: inLabelWidth,
+                    height: dashedThickness,
+                    label: "+",
+                    tooltip: model.t("在左侧添加输入通道", "Add input channel")
+                ) {
+                    appendInputSlot()
+                }
+
+                ForEach(0..<outputSlots.count, id: \.self) { _ in
+                    MatrixDashedPlusCell(
+                        width: cellSize,
+                        height: dashedThickness,
+                        label: "+",
+                        tooltip: model.t("向下扩充输入通道", "Expand input channel")
+                    ) {
+                        appendInputSlot()
+                    }
+                }
+
+                MatrixDashedPlusCell(
+                    width: dashedThickness,
+                    height: dashedThickness,
+                    label: "+",
+                    tooltip: model.t("新建路由规则", "Add Route")
+                ) {
+                    onOpenAddSheet()
+                }
+            }
         }
         .padding(24)
-        .background(Color(red: 0.09, green: 0.09, blue: 0.11).opacity(0.85))
+        .background(Color(red: 0.09, green: 0.09, blue: 0.11).opacity(0.92))
         .cornerRadius(10)
         .overlay(
             RoundedRectangle(cornerRadius: 10)
@@ -410,140 +518,7 @@ struct MatrixCanvasView: View {
         )
     }
 
-    private var leftDashedColumn: some View {
-        VStack(spacing: 4) {
-            // 顶角 [+]
-            MatrixDashedPlusCell(
-                width: dashedBorderThickness,
-                height: outLabelHeight,
-                label: "+",
-                tooltip: model.t("添加输入/输出规则", "Add Route")
-            ) {
-                onOpenAddSheet()
-            }
-
-            // 每个输入行左侧 [+]
-            ForEach(0..<inputSlots.count, id: \.self) { idx in
-                MatrixDashedPlusCell(
-                    width: dashedBorderThickness,
-                    height: cellSize,
-                    label: "+",
-                    tooltip: model.t("在第 \(idx + 1) 行插入输入通道", "Insert Input Channel at row \(idx + 1)")
-                ) {
-                    insertInputSlot(at: idx)
-                }
-            }
-
-            // 底部外围 [+]
-            MatrixDashedPlusCell(
-                width: dashedBorderThickness,
-                height: dashedBorderThickness,
-                label: "+",
-                tooltip: model.t("在末尾添加输入通道", "Add Input Channel at bottom")
-            ) {
-                appendInputSlot()
-            }
-        }
-        .padding(.trailing, 4)
-    }
-
-    private var rightDashedColumn: some View {
-        VStack(spacing: 4) {
-            // 顶角 [+]
-            MatrixDashedPlusCell(
-                width: dashedBorderThickness,
-                height: outLabelHeight,
-                label: "+",
-                tooltip: model.t("在右侧添加输出通道", "Add Output Channel at right")
-            ) {
-                appendOutputSlot()
-            }
-
-            // 每个输入行右侧 [+]
-            ForEach(0..<inputSlots.count, id: \.self) { _ in
-                MatrixDashedPlusCell(
-                    width: dashedBorderThickness,
-                    height: cellSize,
-                    label: "+",
-                    tooltip: model.t("向右扩展输出通道", "Expand output channel")
-                ) {
-                    appendOutputSlot()
-                }
-            }
-
-            // 底角 [+]
-            MatrixDashedPlusCell(
-                width: dashedBorderThickness,
-                height: dashedBorderThickness,
-                label: "+",
-                tooltip: model.t("建立新路由规则", "Add Route")
-            ) {
-                onOpenAddSheet()
-            }
-        }
-        .padding(.leading, 4)
-    }
-
-    private var centerMatrixBody: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // 顶部外围一排 [+] 虚线方格
-            topDashedRow
-
-            // 上侧输出列标头
-            topOutputsHeaderRow
-
-            // 各输入行与交叉点方格
-            ForEach(Array(inputSlots.enumerated()), id: \.element.id) { rowIdx, inSlot in
-                matrixRow(rowIdx: rowIdx, inSlot: inSlot)
-            }
-
-            // 底部外围一排 [+] 虚线方格
-            bottomDashedRow
-        }
-    }
-
-    private var topDashedRow: some View {
-        HStack(spacing: 4) {
-            Rectangle()
-                .fill(Color.clear)
-                .frame(width: inLabelWidth, height: dashedBorderThickness)
-
-            ForEach(0..<outputSlots.count, id: \.self) { cIdx in
-                MatrixDashedPlusCell(
-                    width: cellSize,
-                    height: dashedBorderThickness,
-                    label: "+",
-                    tooltip: model.t("在第 \(cIdx + 1) 列插入输出通道", "Insert Output Channel at column \(cIdx + 1)")
-                ) {
-                    insertOutputSlot(at: cIdx)
-                }
-            }
-        }
-    }
-
-    private var topOutputsHeaderRow: some View {
-        HStack(spacing: 4) {
-            // 对角坐标标头
-            cornerIndicator
-
-            // 输出端点列头
-            ForEach(Array(outputSlots.enumerated()), id: \.element.id) { colIdx, outSlot in
-                OutputEndpointHeader(
-                    slot: outSlot,
-                    colIndex: colIdx,
-                    model: model,
-                    width: cellSize,
-                    height: outLabelHeight,
-                    onSelectEndpoint: { newId, newName, newType in
-                        outputSlots[colIdx].endpointId = newId
-                        outputSlots[colIdx].name = newName
-                        outputSlots[colIdx].typeDesc = newType
-                    }
-                )
-            }
-        }
-    }
-
+    // 坐标指示单元
     private var cornerIndicator: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 6)
@@ -556,14 +531,14 @@ struct MatrixCanvasView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack {
                     Spacer()
-                    Text(model.t("输出 (上)", "Out ↗"))
-                        .font(Theme.cnText(11.5, weight: .bold))
+                    Text("OUT ↗")
+                        .font(Theme.monoDigit(10.5, weight: .bold))
                         .foregroundColor(Theme.amberWarn)
                 }
-                Divider().background(Color.white.opacity(0.1))
+                Divider().background(Color.white.opacity(0.12))
                 HStack {
-                    Text(model.t("输入 (左)", "↙ In"))
-                        .font(Theme.cnText(11.5, weight: .bold))
+                    Text("↙ IN")
+                        .font(Theme.monoDigit(10.5, weight: .bold))
                         .foregroundColor(Theme.neonCyan)
                     Spacer()
                 }
@@ -571,66 +546,17 @@ struct MatrixCanvasView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
         }
-        .frame(width: inLabelWidth, height: outLabelHeight)
-    }
-
-    private func matrixRow(rowIdx: Int, inSlot: MatrixSlot) -> some View {
-        HStack(spacing: 4) {
-            InputEndpointHeader(
-                slot: inSlot,
-                rowIndex: rowIdx,
-                model: model,
-                width: inLabelWidth,
-                height: cellSize,
-                onSelectEndpoint: { newId, newName, newType in
-                    inputSlots[rowIdx].endpointId = newId
-                    inputSlots[rowIdx].name = newName
-                    inputSlots[rowIdx].typeDesc = newType
-                }
-            )
-
-            ForEach(Array(outputSlots.enumerated()), id: \.element.id) { _, outSlot in
-                CrossPointCell(
-                    model: model,
-                    inSlot: inSlot,
-                    outSlot: outSlot,
-                    size: cellSize,
-                    onOpenAddSheet: onOpenAddSheet
-                )
-            }
-        }
-    }
-
-    private var bottomDashedRow: some View {
-        HStack(spacing: 4) {
-            MatrixDashedPlusCell(
-                width: inLabelWidth,
-                height: dashedBorderThickness,
-                label: "+ " + model.t("添加输入通道", "Add Input"),
-                tooltip: model.t("在左侧添加新的输入源行", "Add new input row")
-            ) {
-                appendInputSlot()
-            }
-
-            ForEach(0..<outputSlots.count, id: \.self) { _ in
-                MatrixDashedPlusCell(
-                    width: cellSize,
-                    height: dashedBorderThickness,
-                    label: "+",
-                    tooltip: model.t("在下方扩充通道", "Expand column")
-                ) {
-                    appendInputSlot()
-                }
-            }
-        }
+        .frame(width: inLabelWidth, height: cellSize)
+        .help(model.t("左侧为输入源 (Inputs)，上侧为输出目标 (Outputs)", "Left: Source Inputs, Top: Destination Outputs"))
     }
 
     private func appendInputSlot() {
         let idx = inputSlots.count + 1
         inputSlots.append(MatrixSlot(
+            id: "input_slot_\(UUID().uuidString.prefix(6))",
             endpointId: "",
-            name: model.t("输入通道 \(idx)", "Input \(idx)"),
-            typeDesc: model.t("点击配置", "Configure"),
+            name: model.t("输入 \(idx)", "Input \(idx)"),
+            typeDesc: model.t("未配置", "Unassigned"),
             iconName: "mic"
         ))
     }
@@ -638,9 +564,10 @@ struct MatrixCanvasView: View {
     private func insertInputSlot(at index: Int) {
         let idx = inputSlots.count + 1
         inputSlots.insert(MatrixSlot(
+            id: "input_slot_\(UUID().uuidString.prefix(6))",
             endpointId: "",
-            name: model.t("输入通道 \(idx)", "Input \(idx)"),
-            typeDesc: model.t("点击配置", "Configure"),
+            name: model.t("输入 \(idx)", "Input \(idx)"),
+            typeDesc: model.t("未配置", "Unassigned"),
             iconName: "mic"
         ), at: index)
     }
@@ -648,9 +575,10 @@ struct MatrixCanvasView: View {
     private func appendOutputSlot() {
         let idx = outputSlots.count + 1
         outputSlots.append(MatrixSlot(
+            id: "output_slot_\(UUID().uuidString.prefix(6))",
             endpointId: "",
-            name: model.t("输出通道 \(idx)", "Output \(idx)"),
-            typeDesc: model.t("点击配置", "Configure"),
+            name: model.t("输出 \(idx)", "Output \(idx)"),
+            typeDesc: model.t("未配置", "Unassigned"),
             iconName: "speaker.wave.2"
         ))
     }
@@ -658,16 +586,17 @@ struct MatrixCanvasView: View {
     private func insertOutputSlot(at index: Int) {
         let idx = outputSlots.count + 1
         outputSlots.insert(MatrixSlot(
+            id: "output_slot_\(UUID().uuidString.prefix(6))",
             endpointId: "",
-            name: model.t("输出通道 \(idx)", "Output \(idx)"),
-            typeDesc: model.t("点击配置", "Configure"),
+            name: model.t("输出 \(idx)", "Output \(idx)"),
+            typeDesc: model.t("未配置", "Unassigned"),
             iconName: "speaker.wave.2"
         ), at: index)
     }
 }
 
 // -------------------------------------------------------------
-// 外围虚线“+”号方格单元组件
+// 虚线槽位组件
 // -------------------------------------------------------------
 struct MatrixDashedPlusCell: View {
     let width: CGFloat
@@ -705,7 +634,7 @@ struct MatrixDashedPlusCell: View {
 }
 
 // -------------------------------------------------------------
-// 上侧输出列标头组件
+// 输出列标头组件
 // -------------------------------------------------------------
 struct OutputEndpointHeader: View {
     let slot: MatrixSlot
@@ -717,14 +646,14 @@ struct OutputEndpointHeader: View {
 
     var body: some View {
         Menu {
-            Section(model.t("选择输出设备 (物理扬声器/耳机)", "Physical Outputs")) {
+            Section(model.t("物理输出设备", "Physical Outputs")) {
                 ForEach(model.devices.filter { $0.outChannels > 0 }, id: \.uid) { d in
                     Button(d.name) {
                         onSelectEndpoint(d.uid, d.name, model.t("物理输出", "Device Out"))
                     }
                 }
             }
-            Section(model.t("选择虚拟线缆输入端", "Virtual Cable Inputs")) {
+            Section(model.t("虚拟线缆输入端", "Virtual Cable Inputs")) {
                 ForEach(model.cables, id: \.cableId) { c in
                     Button(c.name) {
                         onSelectEndpoint(c.cableId, c.name, model.t("线缆输入", "Cable In"))
@@ -732,27 +661,25 @@ struct OutputEndpointHeader: View {
                 }
             }
         } label: {
-            VStack(spacing: 4) {
+            VStack(spacing: 3) {
                 HStack(spacing: 3) {
                     Image(systemName: slot.endpointId.isEmpty ? "exclamationmark.circle" : "speaker.wave.2.fill")
-                        .font(.system(size: 10))
-                        .foregroundColor(slot.endpointId.isEmpty ? Theme.amberWarn : Theme.neonCyan)
+                        .font(.system(size: 9.5))
+                        .foregroundColor(slot.endpointId.isEmpty ? Theme.amberWarn : Theme.amberWarn)
                     Text("Out \(colIndex + 1)")
-                        .font(Theme.monoDigit(11, weight: .bold))
-                        .foregroundColor(Theme.neonCyan)
+                        .font(Theme.monoDigit(10.5, weight: .bold))
+                        .foregroundColor(Theme.amberWarn)
                 }
 
                 Text(slot.name)
-                    .font(Theme.cnText(11, weight: .medium))
+                    .font(Theme.cnText(10.5, weight: .medium))
                     .foregroundColor(Theme.textPrimary)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
 
                 ParamCapsule(text: slot.typeDesc, color: slot.endpointId.isEmpty ? Theme.amberWarn : Theme.textTertiary)
             }
-            .padding(.horizontal, 4)
-            .padding(.vertical, 5)
+            .padding(4)
             .frame(width: width, height: height)
             .background(Color.white.opacity(0.025))
             .cornerRadius(5)
@@ -761,13 +688,14 @@ struct OutputEndpointHeader: View {
                     .stroke(Color.white.opacity(0.08), lineWidth: 1)
             )
         }
-        .menuStyle(.borderlessButton)
-        .help(model.t("点击更换或分配此列输出端点：\(slot.name)", "Click to change output endpoint: \(slot.name)"))
+        .buttonStyle(.plain)
+        .frame(width: width, height: height)
+        .help(model.t("点击更换输出端点：\(slot.name)", "Click to change output: \(slot.name)"))
     }
 }
 
 // -------------------------------------------------------------
-// 左侧输入行标头组件
+// 输入行标头组件
 // -------------------------------------------------------------
 struct InputEndpointHeader: View {
     let slot: MatrixSlot
@@ -801,19 +729,19 @@ struct InputEndpointHeader: View {
                 }
             }
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 3) {
                         Image(systemName: slot.endpointId.isEmpty ? "exclamationmark.circle" : "waveform")
-                            .font(.system(size: 10))
+                            .font(.system(size: 9.5))
                             .foregroundColor(slot.endpointId.isEmpty ? Theme.amberWarn : Theme.neonCyan)
                         Text("In \(rowIndex + 1)")
-                            .font(Theme.monoDigit(11, weight: .bold))
+                            .font(Theme.monoDigit(10.5, weight: .bold))
                             .foregroundColor(Theme.neonCyan)
                     }
 
                     Text(slot.name)
-                        .font(Theme.cnText(11.5, weight: .semibold))
+                        .font(Theme.cnText(11, weight: .semibold))
                         .foregroundColor(Theme.textPrimary)
                         .lineLimit(1)
                 }
@@ -831,13 +759,14 @@ struct InputEndpointHeader: View {
                     .stroke(Color.white.opacity(0.08), lineWidth: 1)
             )
         }
-        .menuStyle(.borderlessButton)
-        .help(model.t("点击更换或分配此行输入端点：\(slot.name)", "Click to change input endpoint: \(slot.name)"))
+        .buttonStyle(.plain)
+        .frame(width: width, height: height)
+        .help(model.t("点击更换输入端点：\(slot.name)", "Click to change input: \(slot.name)"))
     }
 }
 
 // -------------------------------------------------------------
-// 交叉连接点单元格组件 (Cross-point Cell)
+// 交叉连接单元组件
 // -------------------------------------------------------------
 struct CrossPointCell: View {
     @ObservedObject var model: AppModel
@@ -906,12 +835,12 @@ struct CrossPointCell: View {
 
     private var tooltipText: String {
         if let r = route {
-            return model.t("路由已连接：\(r.srcName) -> \(r.dstName) (点击断开/删除)", "Connected: \(r.srcName) -> \(r.dstName) (Click to disconnect)")
+            return model.t("已连接：\(r.srcName) -> \(r.dstName) (点击断开)", "Connected: \(r.srcName) -> \(r.dstName) (Click to disconnect)")
         }
         if inSlot.endpointId.isEmpty || outSlot.endpointId.isEmpty {
-            return model.t("端点尚未分配，点击打开路由设置页", "Endpoints unassigned, click to open Route dialog")
+            return model.t("端点未分配，点击配置", "Endpoints unassigned, click to configure")
         }
-        return model.t("点击建立直通路由：\(inSlot.name) -> \(outSlot.name)", "Click to connect: \(inSlot.name) -> \(outSlot.name)")
+        return model.t("点击直连：\(inSlot.name) -> \(outSlot.name)", "Click to connect: \(inSlot.name) -> \(outSlot.name)")
     }
 
     private func handleCellClick() {
@@ -934,7 +863,7 @@ struct CrossPointCell: View {
 }
 
 // -------------------------------------------------------------
-// 视觉上无限的点阵画布背景 (Infinite Dot Grid Canvas)
+// 点阵背景组件
 // -------------------------------------------------------------
 struct InfiniteDotGridCanvas: View {
     var body: some View {
@@ -955,7 +884,7 @@ struct InfiniteDotGridCanvas: View {
 }
 
 // -------------------------------------------------------------
-// 新建路由原生配置面板 (AddRouteSheet - 与 AddTxStreamSheet 严格统一)
+// 新建路由面板
 // -------------------------------------------------------------
 struct AddRouteSheet: View {
     @ObservedObject var model: AppModel
@@ -1009,7 +938,7 @@ struct AddRouteSheet: View {
             Image(systemName: "arrow.triangle.branch")
                 .font(.system(size: 16))
                 .foregroundColor(Theme.neonCyan)
-            Text(model.t("新建音频路由规则", "New Audio Route"))
+            Text(model.t("新建音频路由", "New Audio Route"))
                 .font(Theme.cnText(14, weight: .bold))
                 .foregroundColor(Theme.textPrimary)
             Spacer()
@@ -1028,9 +957,9 @@ struct AddRouteSheet: View {
 
     private var sourcePickerRow: some View {
         HStack {
-            Text(model.t("输入源 (左):", "Source (In):"))
+            Text(model.t("输入源:", "Source:"))
                 .font(Theme.cnText(12.5, weight: .semibold))
-                .frame(width: 100, alignment: .trailing)
+                .frame(width: 80, alignment: .trailing)
 
             Menu {
                 Section(model.t("物理输入设备", "Physical Inputs")) {
@@ -1070,9 +999,9 @@ struct AddRouteSheet: View {
 
     private var destinationPickerRow: some View {
         HStack {
-            Text(model.t("输出目标 (上):", "Destination (Out):"))
+            Text(model.t("输出目标:", "Destination:"))
                 .font(Theme.cnText(12.5, weight: .semibold))
-                .frame(width: 100, alignment: .trailing)
+                .frame(width: 80, alignment: .trailing)
 
             Menu {
                 Section(model.t("物理输出设备", "Physical Outputs")) {
@@ -1106,7 +1035,7 @@ struct AddRouteSheet: View {
         HStack {
             Text(model.t("通道增益:", "Gain:"))
                 .font(Theme.cnText(12.5, weight: .semibold))
-                .frame(width: 100, alignment: .trailing)
+                .frame(width: 80, alignment: .trailing)
 
             Slider(value: $gain, in: 0.0...2.0)
 
