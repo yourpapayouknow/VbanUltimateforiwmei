@@ -5,6 +5,7 @@
 #include "../Common/Types.hpp"
 #include "../VBAN/Parser.hpp"
 #include "../Monitoring/StreamStats.hpp"
+#include "JitterBuffer.hpp"
 
 namespace vban {
 
@@ -13,11 +14,12 @@ using PktCb = std::function<void(const PktInf& inf, const char* sip, uint16_t sp
 
 // 单流上下文封装
 struct StrmCtx {
-    std::string strm;
-    std::string req_ip;
-    PktCb       cb;
-    StrmStts    stts;
-    bool        en{true};
+    std::string             strm;
+    std::string             req_ip;
+    PktCb                   cb;
+    StrmStts                stts;
+    std::shared_ptr<JtrBuf> jtr;
+    bool                    en{true};
 };
 
 // 单端口多流解复用分发器
@@ -106,12 +108,35 @@ public:
         // 更新统计指标
         target->stts.updpkt(inf, sip, sprt);
 
+        // 压入抗网络抖动平滑缓冲
+        if (!target->jtr) {
+            target->jtr = std::make_shared<JtrBuf>(inf.ch, inf.sr, def_qlt_);
+        }
+        target->jtr->pshpkt(inf);
+
         // 派发回调
         if (target->cb) {
             target->cb(inf, sip, sprt);
         }
 
         return true;
+    }
+
+    // 设置全局网络质量预设
+    void setqlt(NetQlt q) {
+        std::lock_guard<std::mutex> lock(mtx_);
+        def_qlt_ = q;
+        for (auto& pair : strms_) {
+            if (pair.second->jtr) {
+                pair.second->jtr->setqlt(q);
+            }
+        }
+    }
+
+    // 获取当前默认网络质量预设
+    NetQlt gtqlt() const {
+        std::lock_guard<std::mutex> lock(mtx_);
+        return def_qlt_;
     }
 
     // 定时轮询检查超时离线流
@@ -146,6 +171,7 @@ private:
     mutable std::mutex mtx_;
     std::unordered_map<std::string, std::shared_ptr<StrmCtx>> strms_;
     std::atomic<bool> auto_dsc_;
+    NetQlt            def_qlt_{NetQlt::Fast};
 };
 
 } // namespace vban

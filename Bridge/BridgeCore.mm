@@ -12,6 +12,9 @@
 #include "../Core/Monitoring/MetricsEngine.hpp"
 #include <thread>
 #include <atomic>
+#include <ifaddrs.h>
+#include <arpa/inet.h>
+#include <net/if.h>
 
 @implementation VbanStrmMetric
 @end
@@ -42,6 +45,8 @@
     std::atomic<bool>                 is_run_;
     std::atomic<bool>                 port_conflict_;
     std::atomic<uint16_t>             bound_port_;
+    std::atomic<uint8_t>              net_qlt_;
+    std::atomic<uint32_t>             buffering_frames_;
 }
 @end
 
@@ -66,12 +71,73 @@
         cbl_           = std::make_shared<vban::CblMgr>();
         rtr_           = std::make_shared<vban::MtrxRtr>();
         mtr_           = std::make_shared<vban::MtrcsEngn>(dmx_, cbl_, rtr_);
-        th_run_        = false;
-        is_run_        = false;
-        port_conflict_ = false;
-        bound_port_    = 6980;
+        th_run_           = false;
+        is_run_           = false;
+        port_conflict_    = false;
+        bound_port_       = 6980;
+        net_qlt_          = 1;
+        buffering_frames_ = 128;
     }
     return self;
+}
+
++ (NSString *)detectHostIpAddress {
+    // 探测本机局域网通信IPv4地址
+    NSString *address = @"127.0.0.1";
+    struct ifaddrs *interfaces = NULL;
+    struct ifaddrs *temp_addr = NULL;
+    if (getifaddrs(&interfaces) == 0) {
+        temp_addr = interfaces;
+        NSString *preferredIp = nil;
+        NSString *fallbackIp = nil;
+        while (temp_addr != NULL) {
+            if (temp_addr->ifa_addr && temp_addr->ifa_addr->sa_family == AF_INET) {
+                if ((temp_addr->ifa_flags & IFF_UP) && !(temp_addr->ifa_flags & IFF_LOOPBACK)) {
+                    NSString *name = [NSString stringWithUTF8String:temp_addr->ifa_name];
+                    char ipStr[INET_ADDRSTRLEN];
+                    inet_ntop(AF_INET, &(((struct sockaddr_in *)temp_addr->ifa_addr)->sin_addr), ipStr, sizeof(ipStr));
+                    NSString *ip = [NSString stringWithUTF8String:ipStr];
+                    if ([name hasPrefix:@"en"]) {
+                        if (!preferredIp) {
+                            preferredIp = ip;
+                        }
+                    } else if (!fallbackIp) {
+                        fallbackIp = ip;
+                    }
+                }
+            }
+            temp_addr = temp_addr->ifa_next;
+        }
+        if (preferredIp) {
+            address = preferredIp;
+        } else if (fallbackIp) {
+            address = fallbackIp;
+        }
+        freeifaddrs(interfaces);
+    }
+    return address;
+}
+
+- (void)setNetworkQuality:(uint8_t)quality {
+    // 设置全局网络质量档位
+    if (quality > 4) quality = 1;
+    net_qlt_.store(quality);
+    if (dmx_) {
+        dmx_->setqlt(static_cast<vban::NetQlt>(quality));
+    }
+}
+
+- (uint8_t)networkQuality {
+    return net_qlt_.load();
+}
+
+- (void)setBufferingFrames:(uint32_t)frames {
+    // 设置音频调度与发包缓冲样本数
+    buffering_frames_.store(frames);
+}
+
+- (uint32_t)bufferingFrames {
+    return buffering_frames_.load();
 }
 
 - (void)dealloc {

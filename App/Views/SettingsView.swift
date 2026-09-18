@@ -3,6 +3,7 @@ import SwiftUI
 // 设置管理双列视图
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    @State private var ipCopied: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,6 +37,7 @@ struct SettingsView: View {
                 Spacer()
 
                 Button(action: {
+                    model.refreshHostIpAddress()
                     model.refreshAll()
                 }) {
                     Text(model.t("刷新状态", "Refresh"))
@@ -76,7 +78,11 @@ struct SettingsView: View {
     private var generalSettingsColumn: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                interfaceAndNetworkSection
+                displayLanguageSection
+
+                Divider().background(Theme.borderSubtle)
+
+                networkTransmissionSection
 
                 Divider().background(Theme.borderSubtle)
 
@@ -90,10 +96,10 @@ struct SettingsView: View {
         }
     }
 
-    // 界面与通信配置
-    private var interfaceAndNetworkSection: some View {
+    // 界面显示语言设置
+    private var displayLanguageSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(model.t("界面与通信", "Interface & Network"))
+            Text(model.t("界面与显示", "Interface & Display"))
                 .font(Theme.cnText(12.5, weight: .bold))
                 .foregroundColor(Theme.neonCyan)
 
@@ -113,22 +119,154 @@ struct SettingsView: View {
                 .frame(width: 180)
                 .help(model.t("切换应用程序界面显示语言", "Switch application display language"))
             }
+        }
+    }
 
-            Divider().background(Color.white.opacity(0.04))
+    // 网络通信与传输参数
+    private var networkTransmissionSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(model.t("网络与传输参数", "Network & Transmission"))
+                .font(Theme.cnText(12.5, weight: .bold))
+                .foregroundColor(Theme.neonCyan)
 
+            // IP Host Address
             HStack(spacing: 16) {
-                Text(model.t("默认 UDP 监听端口", "Default UDP Port"))
-                    .font(Theme.cnText(13, weight: .semibold))
-                    .foregroundColor(Theme.textPrimary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("IP Host Address")
+                        .font(Theme.cnText(13, weight: .semibold))
+                        .foregroundColor(Theme.textPrimary)
+                    Text(model.t("本机局域网通信地址", "Local Host LAN Address"))
+                        .font(Theme.cnText(10.5, weight: .regular))
+                        .foregroundColor(Theme.textTertiary)
+                }
 
                 Spacer()
 
-                TextField("", text: $model.udpPort)
+                HStack(spacing: 8) {
+                    Text(model.hostIpAddress.isEmpty ? "127.0.0.1" : model.hostIpAddress)
+                        .font(Theme.monoDigit(13, weight: .bold))
+                        .foregroundColor(Theme.neonCyan)
+
+                    Button(action: {
+                        model.copyHostIp()
+                        ipCopied = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            ipCopied = false
+                        }
+                    }) {
+                        Text(ipCopied ? model.t("已复制", "Copied") : model.t("复制", "Copy"))
+                            .font(Theme.cnText(10.5, weight: .semibold))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(ipCopied ? Theme.meterGreen.opacity(0.2) : Color.white.opacity(0.04))
+                            .foregroundColor(ipCopied ? Theme.meterGreen : Theme.neonCyan)
+                            .cornerRadius(3)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 3)
+                                    .stroke(ipCopied ? Theme.meterGreen.opacity(0.5) : Theme.neonCyan.opacity(0.35), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help(model.t("复制本机 IP 地址到剪贴板，方便在对端发送设备（如 Voicemeeter / Talkie）中填入", "Copy host IP to clipboard for configuring remote transmitter"))
+                }
+            }
+            .help(model.t("本机局域网通信 IP 地址。当远端设备（如 PC 端 Voicemeeter、手机端 Talkie）向本机发送音频流时，须在对端输入此 IP。", "Local host IP address on your LAN. When remote devices (e.g. Voicemeeter, Talkie) send audio to this machine, enter this IP on the transmitter."))
+
+            Divider().background(Color.white.opacity(0.04))
+
+            // VBAN Port
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("VBAN Port")
+                        .font(Theme.cnText(13, weight: .semibold))
+                        .foregroundColor(Theme.textPrimary)
+                    Text(model.t("UDP 监听与通信端口", "UDP Listening Port"))
+                        .font(Theme.cnText(10.5, weight: .regular))
+                        .foregroundColor(Theme.textTertiary)
+                }
+
+                Spacer()
+
+                TextField("", text: $model.udpPort, onCommit: {
+                    model.retryBindPort()
+                })
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .font(Theme.monoDigit(12.5, weight: .semibold))
+                .frame(width: 85)
+            }
+            .help(model.t("VBAN 官方标准网络监听端口为 6980。同一局域网或同一机器存在多实例时可自定义端口实现隔离。修改后按回车重新绑定。", "Official standard VBAN UDP port is 6980. Change this to isolate multiple instances on the same host or network. Press Enter to rebind."))
+
+            Divider().background(Color.white.opacity(0.04))
+
+            // Username
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Username")
+                        .font(Theme.cnText(13, weight: .semibold))
+                        .foregroundColor(Theme.textPrimary)
+                    Text(model.t("节点呼号与流标识 (≤16字符)", "Station ID & Stream Label (≤16 chars)"))
+                        .font(Theme.cnText(10.5, weight: .regular))
+                        .foregroundColor(Theme.textTertiary)
+                }
+
+                Spacer()
+
+                TextField("", text: $model.username)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .font(Theme.monoDigit(12.5, weight: .semibold))
-                    .frame(width: 85)
-                    .help(model.t("VBAN 官方标准网络监听端口为 6980。底层单套接字根据流名自动解复用。", "Official standard VBAN UDP port is 6980. Single socket automatically demuxes incoming streams by stream name."))
+                    .frame(width: 140)
             }
+            .help(model.t("节点用户名与电台呼号标识（最大 16 字符）。发送流默认使用此标识，方便对端设备识别通信来源。", "Station username and node identifier (max 16 characters). Transmitted streams use this label by default so remote receivers recognize this node."))
+
+            Divider().background(Color.white.opacity(0.04))
+
+            // Network Quality
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Network Quality")
+                        .font(Theme.cnText(13, weight: .semibold))
+                        .foregroundColor(Theme.textPrimary)
+                    Text(model.networkQuality.desc(for: model.language))
+                        .font(Theme.cnText(10.5, weight: .regular))
+                        .foregroundColor(Theme.textTertiary)
+                }
+
+                Spacer()
+
+                Picker("", selection: $model.networkQuality) {
+                    ForEach(VbanNetworkQuality.allCases) { q in
+                        Text(q.displayName).tag(q)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 110)
+            }
+            .help(model.t("网络质量与 Jitter Buffer 抗网络抖动缓冲深度。Optimal(~5ms 局域网超低延迟)、Fast(~10ms 快速推荐)、Medium(~20ms 普通Wi-Fi)、Slow(~40ms 抗抖动)、Very slow(~80ms 极端抗丢包抖动防爆音)。", "Network quality & jitter buffer depth preset. Optimal (~5ms LAN low latency), Fast (~10ms recommended), Medium (~20ms typical Wi-Fi), Slow (~40ms jitter-resistant), Very slow (~80ms maximum underrun protection)."))
+
+            Divider().background(Color.white.opacity(0.04))
+
+            // Buffering
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Buffering")
+                        .font(Theme.cnText(13, weight: .semibold))
+                        .foregroundColor(Theme.textPrimary)
+                    Text(model.bufferingDesc(model.bufferingFrames))
+                        .font(Theme.cnText(10.5, weight: .regular))
+                        .foregroundColor(Theme.textTertiary)
+                }
+
+                Spacer()
+
+                Picker("", selection: $model.bufferingFrames) {
+                    ForEach(model.availableBuffering, id: \.self) { bf in
+                        Text("\(bf)").tag(bf)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 110)
+            }
+            .help(model.t("音频调度与发包缓冲样本数。441(44.1kHz下10ms标称包)、480(48kHz下10ms标称广播包)、128/256/512/1024(经典低延迟与稳健I/O块大小)。", "Audio scheduling and packet payload sample frames. 441 (nominal 10ms at 44.1kHz), 480 (nominal 10ms at 48kHz broadcast), 128/256/512/1024 (classic low latency & safe I/O buffer sizes)."))
         }
     }
 

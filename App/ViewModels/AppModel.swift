@@ -65,6 +65,42 @@ struct VbanTxStreamDesc: Identifiable, Codable {
     }
 }
 
+// 网络质量预设枚举
+enum VbanNetworkQuality: UInt8, CaseIterable, Identifiable {
+    case optimal = 0
+    case fast = 1
+    case medium = 2
+    case slow = 3
+    case verySlow = 4
+
+    var id: UInt8 { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .optimal:  return "Optimal"
+        case .fast:     return "Fast"
+        case .medium:   return "Medium"
+        case .slow:     return "Slow"
+        case .verySlow: return "Very slow"
+        }
+    }
+
+    func desc(for lang: AppLanguage) -> String {
+        switch self {
+        case .optimal:
+            return lang == .chinese ? "极低延迟 (~5ms · 适合千兆有线局域网)" : "Ultra-low latency (~5ms · Wired LAN)"
+        case .fast:
+            return lang == .chinese ? "快速响应 (~10ms · 优质网络推荐)" : "Fast response (~10ms · Recommended)"
+        case .medium:
+            return lang == .chinese ? "平衡模式 (~20ms · 标准 Wi-Fi 环境)" : "Balanced (~20ms · Typical Wi-Fi)"
+        case .slow:
+            return lang == .chinese ? "抗抖动模式 (~40ms · 拥塞网络环境)" : "Jitter resistant (~40ms · Busy network)"
+        case .verySlow:
+            return lang == .chinese ? "极端抗抖动 (~80ms · 最大安全缓冲)" : "Max protection (~80ms · High jitter)"
+        }
+    }
+}
+
 final class AppModel: ObservableObject {
     @Published var activeTab: AppTab = .streams
     @Published var language: AppLanguage = {
@@ -97,10 +133,80 @@ final class AppModel: ObservableObject {
     @Published var conflictProcesses: [VbanConflictProcess] = []
     @Published var showConflictDiagAlert: Bool = false
 
+    // 本机网络 IP 与节点用户名
+    @Published var hostIpAddress: String = ""
+    @Published var username: String = {
+        if let saved = UserDefaults.standard.string(forKey: "vban_username"), !saved.isEmpty {
+            return saved
+        }
+        let hostName = ProcessInfo.processInfo.hostName.components(separatedBy: ".").first ?? "mac"
+        return String(hostName.prefix(16))
+    }() {
+        didSet {
+            let truncated = String(username.prefix(16))
+            if username != truncated {
+                username = truncated
+            }
+            UserDefaults.standard.set(username, forKey: "vban_username")
+        }
+    }
+
+    // 网络质量预设
+    @Published var networkQuality: VbanNetworkQuality = {
+        let val = UInt8(UserDefaults.standard.integer(forKey: "vban_network_quality"))
+        return VbanNetworkQuality(rawValue: val) ?? .fast
+    }() {
+        didSet {
+            UserDefaults.standard.set(Int(networkQuality.rawValue), forKey: "vban_network_quality")
+            bridge.setNetworkQuality(networkQuality.rawValue)
+        }
+    }
+
+    // 音频调度与发包缓冲样本数
+    @Published var bufferingFrames: UInt32 = {
+        let val = UInt32(UserDefaults.standard.integer(forKey: "vban_buffering_frames"))
+        return val > 0 ? val : 128
+    }() {
+        didSet {
+            UserDefaults.standard.set(Int(bufferingFrames), forKey: "vban_buffering_frames")
+            bridge.setBufferingFrames(bufferingFrames)
+        }
+    }
+
+    let availableBuffering: [UInt32] = [128, 256, 441, 480, 512, 1024]
+
+    // 缓冲区样本数业务说明
+    func bufferingDesc(_ frames: UInt32) -> String {
+        switch frames {
+        case 128:  return t("128 采样 (~2.67ms @48k · 极低延迟 I/O 块)", "128 samples (~2.67ms @48k · Ultra-low latency)")
+        case 256:  return t("256 采样 (~5.33ms @48k · 低延迟专业音频块)", "256 samples (~5.33ms @48k · Low latency audio)")
+        case 441:  return t("441 采样 (44.1kHz 下 10ms 标称网络包帧长)", "441 samples (10ms nominal packet at 44.1kHz)")
+        case 480:  return t("480 采样 (48.0kHz 下 10ms 广播标准包帧长)", "480 samples (10ms nominal packet at 48kHz)")
+        case 512:  return t("512 采样 (~10.67ms @48k · 标准音频 I/O 块)", "512 samples (~10.67ms @48k · Standard I/O buffer)")
+        case 1024: return t("1024 采样 (~21.33ms @48k · 大缓冲安全防欠载)", "1024 samples (~21.33ms @48k · Large safety buffer)")
+        default:   return "\(frames) samples"
+        }
+    }
+
+    // 刷新本机局域网 IP
+    func refreshHostIpAddress() {
+        hostIpAddress = VbanBridge.detectHostIpAddress()
+    }
+
+    // 复制本机 IP 到系统剪贴板
+    func copyHostIp() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(hostIpAddress, forType: .string)
+    }
+
     private var timer: Timer?
     private let bridge = VbanBridge.shared()
 
     init() {
+        refreshHostIpAddress()
+        bridge.setNetworkQuality(networkQuality.rawValue)
+        bridge.setBufferingFrames(bufferingFrames)
         loadTxStreams()
         start()
     }

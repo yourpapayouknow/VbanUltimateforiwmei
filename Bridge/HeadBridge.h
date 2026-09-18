@@ -89,6 +89,15 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)isPortConflict;
 - (uint16_t)boundPort;
 
+// 本机网络 IP 探测
++ (NSString *)detectHostIpAddress;
+
+// 网络质量策略与音频缓冲大小 (贯通 JitterBuffer 与 Packetizer)
+- (void)setNetworkQuality:(uint8_t)quality;
+- (uint8_t)networkQuality;
+- (void)setBufferingFrames:(uint32_t)frames;
+- (uint32_t)bufferingFrames;
+
 // 端口占用排查与解除
 - (NSArray<VbanConflictProcess *> *)scanPortOccupants:(uint16_t)port;
 - (BOOL)killProcessByPid:(pid_t)pid;
