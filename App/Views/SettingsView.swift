@@ -249,14 +249,18 @@ struct SettingsView: View {
     // 关于信息高级展示列
     private var aboutHeroColumn: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 16) {
                 identityView
 
                 sloganView
 
                 Divider().background(Theme.borderSubtle)
 
-                specsSection
+                systemToolsSection
+
+                Divider().background(Theme.borderSubtle)
+
+                creditsSection
 
                 Divider().background(Theme.borderSubtle)
 
@@ -306,35 +310,159 @@ struct SettingsView: View {
         .lineSpacing(3)
     }
 
-    // 技术规格清单
-    private var specsSection: some View {
+    // 系统音频工具与快捷入口
+    private var systemToolsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(model.t("技术规格与架构", "Technical Specifications"))
+            Text(model.t("系统音频工具与路径", "System Audio Tools & Paths"))
                 .font(Theme.cnText(12, weight: .bold))
                 .foregroundColor(Theme.neonCyan)
 
-            VStack(spacing: 6) {
-                specRow(label: model.t("传输协议", "Protocol"), value: "VBAN Raw UDP (28B)")
-                specRow(label: model.t("实时内核", "RT Engine"), value: "C++20 SPSC Lock-free")
-                specRow(label: model.t("虚拟驱动", "Audio HAL"), value: "AudioServerPlugIn")
-                specRow(label: model.t("调度精度", "Clocking"), value: "AUHAL Adaptive Sync")
+            HStack(spacing: 8) {
+                toolButton(
+                    title: model.t("音频与MIDI设置", "Audio MIDI Setup"),
+                    helpText: model.t("打开 macOS 原生“音频与MIDI设置”检查声卡参数", "Open native macOS Audio MIDI Setup to inspect audio devices"),
+                    action: {
+                        let url = URL(fileURLWithPath: "/System/Applications/Utilities/Audio MIDI Setup.app")
+                        NSWorkspace.shared.open(url)
+                    }
+                )
+
+                toolButton(
+                    title: model.t("驱动安装目录", "HAL Driver Path"),
+                    helpText: model.t("在 Finder 中定位 CoreAudio HAL 插件驱动目录", "Reveal CoreAudio HAL plug-ins directory in Finder"),
+                    action: {
+                        let url = URL(fileURLWithPath: "/Library/Audio/Plug-Ins/HAL")
+                        NSWorkspace.shared.open(url)
+                    }
+                )
+
+                toolButton(
+                    title: model.t("配置共享目录", "Config Path"),
+                    helpText: model.t("在 Finder 中定位虚拟音频线缆共享配置文件目录", "Reveal VBANUltimate shared configuration folder in Finder"),
+                    action: {
+                        let url = URL(fileURLWithPath: "/Library/Application Support/VBANUltimate")
+                        NSWorkspace.shared.open(url)
+                    }
+                )
             }
         }
     }
 
-    // 技术规格行
-    private func specRow(label: String, value: String) -> some View {
-        HStack {
-            Text(label)
-                .font(Theme.cnText(11.5, weight: .medium))
-                .foregroundColor(Theme.textTertiary)
+    // 系统工具按钮
+    private func toolButton(title: String, helpText: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(Theme.cnText(11.5, weight: .semibold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.white.opacity(0.03))
+                .foregroundColor(Theme.textPrimary)
+                .cornerRadius(4)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(Theme.borderSubtle, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .help(helpText)
+    }
+
+    // 开源鸣谢与致敬
+    private var creditsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(model.t("开源鸣谢与参考", "Credits & Acknowledgments"))
+                .font(Theme.cnText(12, weight: .bold))
+                .foregroundColor(Theme.neonCyan)
+
+            VStack(spacing: 7) {
+                creditRow(
+                    name: "VB-Audio Software",
+                    author: "Vincent Burel",
+                    desc: model.t("VBAN 网络音频通信协议官方发明者与标准规范制定", "Official VBAN audio protocol creator & standards authority"),
+                    urlString: "https://vb-audio.com/"
+                )
+
+                creditRow(
+                    name: "BlackHole",
+                    author: "Devin Roth (Existential Audio)",
+                    desc: model.t("macOS 虚拟音频回环驱动架构与 CoreAudio HAL 属性规范实践", "macOS virtual audio loopback driver & CoreAudio HAL reference"),
+                    urlString: "https://github.com/ExistentialAudio/BlackHole"
+                )
+
+                creditRow(
+                    name: "libASPL",
+                    author: "Alexander Gavrilov (gavv)",
+                    desc: model.t("现代 C++ CoreAudio AudioServerPlugIn 驱动面向对象框架", "Modern C++ AudioServerPlugIn framework for macOS"),
+                    urlString: "https://github.com/gavv/libASPL"
+                )
+
+                creditRow(
+                    name: "vban",
+                    author: "Benoit Quiniou (quiniouben)",
+                    desc: model.t("VBAN 官方通信协议开源 C 语言参考实现", "C reference implementation of VBAN audio protocol"),
+                    urlString: "https://github.com/quiniouben/vban"
+                )
+
+                creditRow(
+                    name: "Splitwave",
+                    author: "Horuse",
+                    desc: model.t("基于目录监听的动态虚拟设备无感重载机制参考", "Dynamic device reload mechanism via directory watching"),
+                    urlString: "https://github.com/Horuse/Splitwave"
+                )
+            }
+        }
+    }
+
+    // 鸣谢列表行
+    private func creditRow(name: String, author: String, desc: String, urlString: String) -> some View {
+        HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(name)
+                        .font(Theme.monoDigit(11.5, weight: .bold))
+                        .foregroundColor(Theme.textPrimary)
+
+                    Text("• \(author)")
+                        .font(Theme.cnText(11, weight: .medium))
+                        .foregroundColor(Theme.textTertiary)
+                }
+
+                Text(desc)
+                    .font(Theme.cnText(10.5, weight: .regular))
+                    .foregroundColor(Theme.textTertiary.opacity(0.85))
+                    .lineLimit(1)
+            }
 
             Spacer()
 
-            Text(value)
-                .font(Theme.monoDigit(11.5, weight: .semibold))
-                .foregroundColor(Theme.textPrimary)
+            Button(action: {
+                if let url = URL(string: urlString) {
+                    NSWorkspace.shared.open(url)
+                }
+            }) {
+                Text(model.t("访问", "Visit"))
+                    .font(Theme.cnText(10, weight: .semibold))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2.5)
+                    .background(Color.white.opacity(0.04))
+                    .foregroundColor(Theme.neonCyan)
+                    .cornerRadius(3)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 3)
+                            .stroke(Theme.neonCyan.opacity(0.3), lineWidth: 1)
+                    )
+            }
+            .buttonStyle(.plain)
+            .help(urlString)
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.white.opacity(0.015))
+        .cornerRadius(4)
+        .overlay(
+            RoundedRectangle(cornerRadius: 4)
+                .stroke(Color.white.opacity(0.04), lineWidth: 1)
+        )
     }
 
     // 版权与外链支持
