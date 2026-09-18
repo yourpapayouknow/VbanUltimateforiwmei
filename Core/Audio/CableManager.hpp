@@ -4,6 +4,7 @@
 #include "../Common/Head.hpp"
 #include "../Common/Types.hpp"
 #include "DeviceCatalog.hpp"
+#include <sys/stat.h>
 
 namespace vban {
 
@@ -21,9 +22,25 @@ struct CblItem {
 // 虚拟音频线缆生命周期管理器
 class CblMgr {
 public:
-    explicit CblMgr(std::string cfg_dir = "/Library/Application Support/VBANUltimate")
-        : cfg_dir_(std::move(cfg_dir)),
-          cfg_path_(cfg_dir_ + "/cables.plist") {
+    explicit CblMgr(std::string cfg_dir = "") {
+        if (cfg_dir.empty()) {
+            const char* sys_dir = "/Library/Application Support/VBANUltimate";
+            if (::access(sys_dir, W_OK) == 0) {
+                cfg_dir_ = sys_dir;
+            } else {
+                const char* home = std::getenv("HOME");
+                if (home) {
+                    std::string user_dir = std::string(home) + "/Library/Application Support/VBANUltimate";
+                    ::mkdir(user_dir.c_str(), 0755);
+                    cfg_dir_ = user_dir;
+                } else {
+                    cfg_dir_ = sys_dir;
+                }
+            }
+        } else {
+            cfg_dir_ = std::move(cfg_dir);
+        }
+        cfg_path_ = cfg_dir_ + "/cables.plist";
         ldcfg();
     }
 
@@ -42,7 +59,8 @@ public:
         }
 
         cbls_.push_back({id, name, chs, sr, true});
-        return svcfg();
+        svcfg();
+        return true;
     }
 
     // 删除指定虚拟音频线缆
@@ -54,7 +72,8 @@ public:
         });
         if (it != cbls_.end()) {
             cbls_.erase(it, cbls_.end());
-            return svcfg();
+            svcfg();
+            return true;
         }
         return false;
     }
@@ -67,7 +86,8 @@ public:
         for (auto& c : cbls_) {
             if (c.id == id) {
                 c.name = new_name;
-                return svcfg();
+                svcfg();
+                return true;
             }
         }
         return false;
@@ -187,6 +207,7 @@ private:
         }
 
         // 写入临时文件并通过 rename 原子替换
+        ::mkdir(cfg_dir_.c_str(), 0755);
         std::string tmp_path = cfg_path_ + ".tmp";
         FILE* fp = std::fopen(tmp_path.c_str(), "wb");
         if (!fp) {
