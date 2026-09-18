@@ -1,229 +1,1149 @@
 import SwiftUI
 
+// 视图展示模式
+enum MatrixViewMode: String, CaseIterable {
+    case list
+    case matrix
+}
+
+// 矩阵槽位端点描述
+struct MatrixSlot: Identifiable, Equatable {
+    let id: UUID = UUID()
+    var endpointId: String
+    var name: String
+    var typeDesc: String
+    var iconName: String
+}
+
 struct MatrixView: View {
     @ObservedObject var model: AppModel
 
-    @State private var selectedSrcId   = ""
-    @State private var selectedSrcName = ""
-    @State private var selectedDstId   = ""
-    @State private var selectedDstName = ""
+    @State private var viewMode: MatrixViewMode = .list
+    @State private var showAddRouteSheet = false
+
+    // 默认 4x4 矩阵的输入端点行（左侧输入）与输出端点列（上侧输出）
+    @State private var inputSlots: [MatrixSlot] = []
+    @State private var outputSlots: [MatrixSlot] = []
+    @State private var isInitialized = false
 
     var body: some View {
         VStack(spacing: 0) {
-            // 工具栏操作条 (固定高度 40pt)
-            HStack(spacing: 12) {
-                Text(model.t("路由矩阵", "Routing Matrix"))
-                    .font(Theme.cnText(14, weight: .bold))
-                    .foregroundColor(Theme.textPrimary)
-                    .help(model.t("在物理声卡、虚拟音频线缆与 VBAN 网络流之间建立任意通道交汇", "Interconnect physical audio devices, virtual cables, and VBAN network streams"))
-
-                Spacer()
-
-                // 源信号端点下拉
-                Menu {
-                    Section(model.t("物理输入设备", "Physical Inputs")) {
-                        ForEach(model.devices.filter { $0.inChannels > 0 }, id: \.uid) { d in
-                            Button(d.name) {
-                                selectedSrcId = d.uid
-                                selectedSrcName = d.name
-                            }
-                        }
-                    }
-                    Section(model.t("虚拟线缆输出", "Virtual Cable Outputs")) {
-                        ForEach(model.cables, id: \.cableId) { c in
-                            Button(c.name) {
-                                selectedSrcId = c.cableId
-                                selectedSrcName = c.name
-                            }
-                        }
-                    }
-                    Section(model.t("网络接收流", "Network Incoming Streams")) {
-                        ForEach(model.metrics.rxStreams, id: \.name) { s in
-                            Button(s.name) {
-                                selectedSrcId = s.name
-                                selectedSrcName = "VBAN [\(s.name)]"
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.down.right.and.arrow.up.left")
-                            .font(.system(size: 11))
-                        Text(selectedSrcName.isEmpty ? model.t("选择输入源...", "Select Source...") : selectedSrcName)
-                            .font(Theme.cnText(12.5, weight: .semibold))
-                    }
-                }
-                .menuStyle(.borderedButton)
-                .frame(width: 180)
-                .help(model.t("选择信号输入源端点", "Select audio signal source endpoint"))
-
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(Theme.textTertiary)
-
-                // 目标端点下拉
-                Menu {
-                    Section(model.t("物理输出设备", "Physical Outputs")) {
-                        ForEach(model.devices.filter { $0.outChannels > 0 }, id: \.uid) { d in
-                            Button(d.name) {
-                                selectedDstId = d.uid
-                                selectedDstName = d.name
-                            }
-                        }
-                    }
-                    Section(model.t("虚拟线缆输入", "Virtual Cable Inputs")) {
-                        ForEach(model.cables, id: \.cableId) { c in
-                            Button(c.name) {
-                                selectedDstId = c.cableId
-                                selectedDstName = c.name
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.up.right.and.arrow.down.left")
-                            .font(.system(size: 11))
-                        Text(selectedDstName.isEmpty ? model.t("选择输出目标...", "Select Destination...") : selectedDstName)
-                            .font(Theme.cnText(12.5, weight: .semibold))
-                    }
-                }
-                .menuStyle(.borderedButton)
-                .frame(width: 180)
-                .help(model.t("选择信号输出目标端点", "Select audio signal destination endpoint"))
-
-                Button(action: {
-                    guard !selectedSrcId.isEmpty, !selectedDstId.isEmpty else { return }
-                    model.addRoute(srcId: selectedSrcId, srcName: selectedSrcName,
-                                   dstId: selectedDstId, dstName: selectedDstName, gain: 1.0)
-                    selectedSrcId = ""
-                    selectedSrcName = ""
-                    selectedDstId = ""
-                    selectedDstName = ""
-                }) {
-                    Label(model.t("建立路由", "Connect"), systemImage: "link")
-                        .font(Theme.cnText(12, weight: .semibold))
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.neonCyan)
-                .disabled(selectedSrcId.isEmpty || selectedDstId.isEmpty)
-                .help(model.t("建立输入源到输出目标的交叉连接路由", "Establish cross-point route from source to destination"))
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 40)
-            .background(Color.white.opacity(0.03))
+            topToolbar
 
             Divider().background(Theme.borderSubtle)
 
-            // 表头 (固定高度 30pt)
-            HStack(spacing: 12) {
-                Text(model.t("状态", "Status"))
-                    .frame(width: 44, alignment: .center)
-                Text(model.t("输入源", "Source"))
-                    .frame(width: 210, alignment: .leading)
-                Text("")
-                    .frame(width: 20, alignment: .center)
-                Text(model.t("输出目标", "Destination"))
-                    .frame(width: 210, alignment: .leading)
-                Text(model.t("路由增益", "Gain"))
-                    .frame(width: 140, alignment: .center)
-                Text(model.t("静音", "Mute"))
-                    .frame(width: 50, alignment: .center)
-                Spacer()
-                Text(model.t("操作", "Action"))
-                    .frame(width: 44, alignment: .center)
-            }
-            .font(Theme.cnText(12.5, weight: .bold))
-            .foregroundColor(Theme.textTertiary)
-            .padding(.horizontal, 16)
-            .frame(height: 30)
-            .background(Color.black.opacity(0.2))
-
-            Divider().background(Theme.borderSubtle)
-
-            // 路由规则列表
-            if model.routes.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "arrow.triangle.branch")
-                        .font(.system(size: 28))
-                        .foregroundColor(Theme.textTertiary)
-                    Text(model.t("无活动路由连接", "No Active Routes"))
-                        .font(Theme.cnText(14, weight: .semibold))
-                        .foregroundColor(Theme.textTertiary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .help(model.t("在上方工具栏选择输入源与输出目标后点击“建立路由”即可添加通道连接", "Select source and destination above and click Connect to add route"))
+            if viewMode == .list {
+                MatrixListView(model: model)
             } else {
-                ScrollView {
-                    VStack(spacing: 0) {
-                        ForEach(Array(model.routes.enumerated()), id: \.element.routeId) { idx, r in
-                            HStack(spacing: 12) {
-                                StatusLed(isActive: r.enabled, activeColor: Theme.neonCyan)
-                                    .frame(width: 44, alignment: .center)
-
-                                Text(r.srcName)
-                                    .font(Theme.cnText(13.5, weight: .semibold))
-                                    .foregroundColor(Theme.textPrimary)
-                                    .frame(width: 210, alignment: .leading)
-
-                                Image(systemName: "arrow.right")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(Theme.textTertiary)
-                                    .frame(width: 20, alignment: .center)
-
-                                Text(r.dstName)
-                                    .font(Theme.cnText(13.5, weight: .semibold))
-                                    .foregroundColor(Theme.textPrimary)
-                                    .frame(width: 210, alignment: .leading)
-
-                                HStack(spacing: 6) {
-                                    Text(String(format: "%+.1f dB", (r.gain - 1.0) * 12.0))
-                                        .font(Theme.monoDigit(12.5, weight: .bold))
-                                        .foregroundColor(Theme.neonCyan)
-                                        .frame(width: 60, alignment: .trailing)
-
-                                    Slider(value: Binding(
-                                        get: { r.gain },
-                                        set: { newVal in }
-                                    ), in: 0.0...2.0)
-                                    .frame(width: 70)
-                                    .help(model.t("调节通道增益 (-12dB 至 +12dB)", "Adjust route channel gain (-12dB to +12dB)"))
-                                }
-                                .frame(width: 140, alignment: .center)
-
-                                Button(action: {
-                                    model.toggleRoute(id: r.routeId, enabled: !r.enabled)
-                                }) {
-                                    Image(systemName: r.enabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                                        .font(.system(size: 13))
-                                        .foregroundColor(r.enabled ? Theme.meterGreen : Theme.textTertiary)
-                                }
-                                .buttonStyle(.plain)
-                                .frame(width: 50, alignment: .center)
-                                .help(model.t("切换通道静音状态", "Toggle channel mute"))
-
-                                Spacer()
-
-                                Button(action: {
-                                    model.removeRoute(id: r.routeId)
-                                }) {
-                                    Image(systemName: "trash")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(Theme.alertRed)
-                                }
-                                .buttonStyle(.plain)
-                                .frame(width: 44, alignment: .center)
-                                .help(model.t("删除该条路由连接", "Delete this routing connection"))
-                            }
-                            .padding(.horizontal, 16)
-                            .frame(height: 38)
-                            .background(idx % 2 == 0 ? Color.clear : Theme.rowAltBg)
-
-                            Divider().background(Theme.borderSubtle)
-                        }
-                    }
-                }
+                MatrixCanvasView(
+                    model: model,
+                    inputSlots: $inputSlots,
+                    outputSlots: $outputSlots,
+                    onOpenAddSheet: { showAddRouteSheet = true }
+                )
             }
         }
         .background(Theme.windowBg)
+        .sheet(isPresented: $showAddRouteSheet) {
+            AddRouteSheet(model: model, isPresented: $showAddRouteSheet)
+        }
+        .onAppear {
+            if !isInitialized {
+                initSlots()
+                isInitialized = true
+            }
+        }
+    }
+
+    // 顶部操作工具栏 (固定 40pt)
+    private var topToolbar: some View {
+        HStack(spacing: 12) {
+            // 方形胶囊视图切换器 (替代多余的“路由矩阵”静态文字)
+            viewModeCapsule
+
+            Spacer()
+
+            // 与“音频流”页统一规范的“建立路由”弹出页按钮
+            addRouteButton
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 40)
+        .background(Color.white.opacity(0.03))
+    }
+
+    // 方形胶囊视图切换器
+    private var viewModeCapsule: some View {
+        HStack(spacing: 2) {
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    viewMode = .list
+                }
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "list.bullet")
+                        .font(.system(size: 11, weight: .bold))
+                    Text(model.t("列表", "List"))
+                        .font(Theme.cnText(12, weight: .semibold))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(viewMode == .list ? Theme.neonCyan.opacity(0.18) : Color.white.opacity(0.04))
+                .foregroundColor(viewMode == .list ? Theme.neonCyan : Theme.textSecondary)
+                .cornerRadius(4)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(viewMode == .list ? Theme.neonCyan.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+            .help(model.t("以列表形式展示所有活动路由", "Show active routes in a list view"))
+
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    viewMode = .matrix
+                }
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "square.grid.2x2")
+                        .font(.system(size: 11, weight: .bold))
+                    Text(model.t("矩阵", "Matrix"))
+                        .font(Theme.cnText(12, weight: .semibold))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(viewMode == .matrix ? Theme.neonCyan.opacity(0.18) : Color.white.opacity(0.04))
+                .foregroundColor(viewMode == .matrix ? Theme.neonCyan : Theme.textSecondary)
+                .cornerRadius(4)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(viewMode == .matrix ? Theme.neonCyan.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+            .help(model.t("以二维交叉矩阵画布展示音频路由", "Show audio routing on a cross-point matrix canvas"))
+        }
+        .padding(2)
+        .background(Color.white.opacity(0.03))
+        .cornerRadius(6)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+        )
+    }
+
+    // 建立路由按钮
+    private var addRouteButton: some View {
+        Button(action: { showAddRouteSheet = true }) {
+            HStack(spacing: 4) {
+                Image(systemName: "plus")
+                    .font(.system(size: 11, weight: .bold))
+                Text(model.t("建立路由", "Add Route"))
+                    .font(Theme.cnText(12, weight: .semibold))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(Theme.neonCyan.opacity(0.18))
+            .foregroundColor(Theme.neonCyan)
+            .cornerRadius(4)
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(Theme.neonCyan.opacity(0.4), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .help(model.t("新建输入源到输出目标的交叉连接路由", "Configure and add a new routing connection"))
+    }
+
+    // 初始化默认 4x4 矩阵槽位（左侧输入，上侧输出）
+    private func initSlots() {
+        var availableInputs: [MatrixSlot] = []
+        for dev in model.devices.filter({ $0.inChannels > 0 }) {
+            availableInputs.append(MatrixSlot(endpointId: dev.uid, name: dev.name, typeDesc: model.t("物理输入", "Device In"), iconName: "mic.fill"))
+        }
+        for cable in model.cables {
+            availableInputs.append(MatrixSlot(endpointId: cable.cableId, name: cable.name, typeDesc: model.t("线缆输出", "Cable Out"), iconName: "cable.connector"))
+        }
+        for strm in model.metrics.rxStreams {
+            availableInputs.append(MatrixSlot(endpointId: strm.name, name: "VBAN [\(strm.name)]", typeDesc: model.t("网络流", "VBAN RX"), iconName: "waveform"))
+        }
+
+        var availableOutputs: [MatrixSlot] = []
+        for dev in model.devices.filter({ $0.outChannels > 0 }) {
+            availableOutputs.append(MatrixSlot(endpointId: dev.uid, name: dev.name, typeDesc: model.t("物理输出", "Device Out"), iconName: "speaker.wave.2.fill"))
+        }
+        for cable in model.cables {
+            availableOutputs.append(MatrixSlot(endpointId: cable.cableId, name: cable.name, typeDesc: model.t("线缆输入", "Cable In"), iconName: "cable.connector"))
+        }
+
+        var ins = Array(availableInputs.prefix(4))
+        var inIndex = ins.count + 1
+        while ins.count < 4 {
+            ins.append(MatrixSlot(endpointId: "", name: model.t("输入通道 \(inIndex)", "Input \(inIndex)"), typeDesc: model.t("未配置", "Unassigned"), iconName: "arrow.down.right.and.arrow.up.left"))
+            inIndex += 1
+        }
+        self.inputSlots = ins
+
+        var outs = Array(availableOutputs.prefix(4))
+        var outIndex = outs.count + 1
+        while outs.count < 4 {
+            outs.append(MatrixSlot(endpointId: "", name: model.t("输出通道 \(outIndex)", "Output \(outIndex)"), typeDesc: model.t("未配置", "Unassigned"), iconName: "arrow.up.right.and.arrow.down.left"))
+            outIndex += 1
+        }
+        self.outputSlots = outs
+    }
+}
+
+// -------------------------------------------------------------
+// 列表型视图 (MatrixListView)
+// -------------------------------------------------------------
+struct MatrixListView: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            tableHeader
+
+            Divider().background(Theme.borderSubtle)
+
+            if model.routes.isEmpty {
+                emptyState
+            } else {
+                routesScrollView
+            }
+        }
+    }
+
+    private var tableHeader: some View {
+        HStack(spacing: 12) {
+            Text(model.t("状态", "Status"))
+                .frame(width: 44, alignment: .center)
+            Text(model.t("输入源 (左)", "Source (In)"))
+                .frame(width: 210, alignment: .leading)
+            Text("")
+                .frame(width: 20, alignment: .center)
+            Text(model.t("输出目标 (上)", "Destination (Out)"))
+                .frame(width: 210, alignment: .leading)
+            Text(model.t("路由增益", "Gain"))
+                .frame(width: 140, alignment: .center)
+            Text(model.t("静音", "Mute"))
+                .frame(width: 50, alignment: .center)
+            Spacer()
+            Text(model.t("操作", "Action"))
+                .frame(width: 44, alignment: .center)
+        }
+        .font(Theme.cnText(12.5, weight: .bold))
+        .foregroundColor(Theme.textTertiary)
+        .padding(.horizontal, 16)
+        .frame(height: 30)
+        .background(Color.black.opacity(0.2))
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "arrow.triangle.branch")
+                .font(.system(size: 28))
+                .foregroundColor(Theme.textTertiary)
+            Text(model.t("无活动路由连接", "No Active Routes"))
+                .font(Theme.cnText(14, weight: .semibold))
+                .foregroundColor(Theme.textTertiary)
+            Text(model.t("点击右上角 [+ 建立路由] 或切换至矩阵型画布即可直观连接通道", "Click [+ Add Route] or switch to Matrix view to connect channels"))
+                .font(Theme.cnText(12, weight: .regular))
+                .foregroundColor(Theme.textTertiary.opacity(0.8))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var routesScrollView: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                ForEach(Array(model.routes.enumerated()), id: \.element.routeId) { idx, r in
+                    routeRow(idx: idx, r: r)
+                    Divider().background(Theme.borderSubtle)
+                }
+            }
+        }
+    }
+
+    private func routeRow(idx: Int, r: VbanRouteDesc) -> some View {
+        HStack(spacing: 12) {
+            StatusLed(isActive: r.enabled, activeColor: Theme.neonCyan)
+                .frame(width: 44, alignment: .center)
+
+            Text(r.srcName)
+                .font(Theme.cnText(13.5, weight: .semibold))
+                .foregroundColor(Theme.textPrimary)
+                .frame(width: 210, alignment: .leading)
+
+            Image(systemName: "arrow.right")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(Theme.textTertiary)
+                .frame(width: 20, alignment: .center)
+
+            Text(r.dstName)
+                .font(Theme.cnText(13.5, weight: .semibold))
+                .foregroundColor(Theme.textPrimary)
+                .frame(width: 210, alignment: .leading)
+
+            HStack(spacing: 6) {
+                Text(String(format: "%+.1f dB", (r.gain - 1.0) * 12.0))
+                    .font(Theme.monoDigit(12.5, weight: .bold))
+                    .foregroundColor(Theme.neonCyan)
+                    .frame(width: 60, alignment: .trailing)
+
+                Slider(value: Binding(
+                    get: { r.gain },
+                    set: { _ in }
+                ), in: 0.0...2.0)
+                .frame(width: 70)
+                .help(model.t("调节通道增益 (-12dB 至 +12dB)", "Adjust route channel gain (-12dB to +12dB)"))
+            }
+            .frame(width: 140, alignment: .center)
+
+            Button(action: {
+                model.toggleRoute(id: r.routeId, enabled: !r.enabled)
+            }) {
+                Image(systemName: r.enabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                    .font(.system(size: 13))
+                    .foregroundColor(r.enabled ? Theme.meterGreen : Theme.textTertiary)
+            }
+            .buttonStyle(.plain)
+            .frame(width: 50, alignment: .center)
+            .help(model.t("切换通道静音状态", "Toggle channel mute"))
+
+            Spacer()
+
+            Button(action: {
+                model.removeRoute(id: r.routeId)
+            }) {
+                Image(systemName: "trash")
+                    .font(.system(size: 12))
+                    .foregroundColor(Theme.alertRed)
+            }
+            .buttonStyle(.plain)
+            .frame(width: 44, alignment: .center)
+            .help(model.t("删除该条路由连接", "Delete this routing connection"))
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 38)
+        .background(idx % 2 == 0 ? Color.clear : Theme.rowAltBg)
+    }
+}
+
+// -------------------------------------------------------------
+// 矩阵型视图 (MatrixCanvasView) - 无限画布 + 默认4x4 + 外围一圈虚线“+”号方格
+// -------------------------------------------------------------
+struct MatrixCanvasView: View {
+    @ObservedObject var model: AppModel
+    @Binding var inputSlots: [MatrixSlot]
+    @Binding var outputSlots: [MatrixSlot]
+    var onOpenAddSheet: () -> Void
+
+    private let cellSize: CGFloat = 68
+    private let inLabelWidth: CGFloat = 148
+    private let outLabelHeight: CGFloat = 76
+    private let dashedBorderThickness: CGFloat = 46
+
+    var body: some View {
+        ScrollView([.horizontal, .vertical], showsIndicators: true) {
+            ZStack(alignment: .topLeading) {
+                // 视觉上无限延伸的点阵画布背景
+                InfiniteDotGridCanvas()
+                    .frame(minWidth: 1600, minHeight: 1200)
+
+                VStack(alignment: .leading, spacing: 14) {
+                    guideBanner
+
+                    matrixGridWrapper
+                }
+                .padding(32)
+            }
+        }
+    }
+
+    private var guideBanner: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 6) {
+                Circle().fill(Theme.neonCyan).frame(width: 7, height: 7)
+                Text(model.t("左侧行：输入源 (Inputs)", "Left Rows: Source Inputs"))
+                    .font(Theme.cnText(12, weight: .semibold))
+                    .foregroundColor(Theme.textSecondary)
+            }
+            Text("•").foregroundColor(Theme.textTertiary)
+            HStack(spacing: 6) {
+                Circle().fill(Theme.amberWarn).frame(width: 7, height: 7)
+                Text(model.t("上侧列：输出目标 (Outputs)", "Top Columns: Destination Outputs"))
+                    .font(Theme.cnText(12, weight: .semibold))
+                    .foregroundColor(Theme.textSecondary)
+            }
+            Text("•").foregroundColor(Theme.textTertiary)
+            Text(model.t("点击外围虚线 [+] 方格即可拓展通道，点击交叉方格一键建立/断开连线", "Click perimeter dashed [+] to expand, click cross-point to connect/disconnect"))
+                .font(Theme.cnText(11.5, weight: .regular))
+                .foregroundColor(Theme.textTertiary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(Color.white.opacity(0.025))
+        .cornerRadius(6)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+        )
+    }
+
+    private var matrixGridWrapper: some View {
+        HStack(alignment: .top, spacing: 0) {
+            // 1. 最左侧外围一列虚线方格
+            leftDashedColumn
+
+            // 2. 主体：上外圈虚线行 + 列标头 + 交叉行 + 下外圈虚线行
+            centerMatrixBody
+
+            // 3. 最右侧外围一列虚线方格
+            rightDashedColumn
+        }
+        .padding(24)
+        .background(Color(red: 0.09, green: 0.09, blue: 0.11).opacity(0.85))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    private var leftDashedColumn: some View {
+        VStack(spacing: 4) {
+            // 顶角 [+]
+            MatrixDashedPlusCell(
+                width: dashedBorderThickness,
+                height: outLabelHeight,
+                label: "+",
+                tooltip: model.t("添加输入/输出规则", "Add Route")
+            ) {
+                onOpenAddSheet()
+            }
+
+            // 每个输入行左侧 [+]
+            ForEach(0..<inputSlots.count, id: \.self) { idx in
+                MatrixDashedPlusCell(
+                    width: dashedBorderThickness,
+                    height: cellSize,
+                    label: "+",
+                    tooltip: model.t("在第 \(idx + 1) 行插入输入通道", "Insert Input Channel at row \(idx + 1)")
+                ) {
+                    insertInputSlot(at: idx)
+                }
+            }
+
+            // 底部外围 [+]
+            MatrixDashedPlusCell(
+                width: dashedBorderThickness,
+                height: dashedBorderThickness,
+                label: "+",
+                tooltip: model.t("在末尾添加输入通道", "Add Input Channel at bottom")
+            ) {
+                appendInputSlot()
+            }
+        }
+        .padding(.trailing, 4)
+    }
+
+    private var rightDashedColumn: some View {
+        VStack(spacing: 4) {
+            // 顶角 [+]
+            MatrixDashedPlusCell(
+                width: dashedBorderThickness,
+                height: outLabelHeight,
+                label: "+",
+                tooltip: model.t("在右侧添加输出通道", "Add Output Channel at right")
+            ) {
+                appendOutputSlot()
+            }
+
+            // 每个输入行右侧 [+]
+            ForEach(0..<inputSlots.count, id: \.self) { _ in
+                MatrixDashedPlusCell(
+                    width: dashedBorderThickness,
+                    height: cellSize,
+                    label: "+",
+                    tooltip: model.t("向右扩展输出通道", "Expand output channel")
+                ) {
+                    appendOutputSlot()
+                }
+            }
+
+            // 底角 [+]
+            MatrixDashedPlusCell(
+                width: dashedBorderThickness,
+                height: dashedBorderThickness,
+                label: "+",
+                tooltip: model.t("建立新路由规则", "Add Route")
+            ) {
+                onOpenAddSheet()
+            }
+        }
+        .padding(.leading, 4)
+    }
+
+    private var centerMatrixBody: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // 顶部外围一排 [+] 虚线方格
+            topDashedRow
+
+            // 上侧输出列标头
+            topOutputsHeaderRow
+
+            // 各输入行与交叉点方格
+            ForEach(Array(inputSlots.enumerated()), id: \.element.id) { rowIdx, inSlot in
+                matrixRow(rowIdx: rowIdx, inSlot: inSlot)
+            }
+
+            // 底部外围一排 [+] 虚线方格
+            bottomDashedRow
+        }
+    }
+
+    private var topDashedRow: some View {
+        HStack(spacing: 4) {
+            Rectangle()
+                .fill(Color.clear)
+                .frame(width: inLabelWidth, height: dashedBorderThickness)
+
+            ForEach(0..<outputSlots.count, id: \.self) { cIdx in
+                MatrixDashedPlusCell(
+                    width: cellSize,
+                    height: dashedBorderThickness,
+                    label: "+",
+                    tooltip: model.t("在第 \(cIdx + 1) 列插入输出通道", "Insert Output Channel at column \(cIdx + 1)")
+                ) {
+                    insertOutputSlot(at: cIdx)
+                }
+            }
+        }
+    }
+
+    private var topOutputsHeaderRow: some View {
+        HStack(spacing: 4) {
+            // 对角坐标标头
+            cornerIndicator
+
+            // 输出端点列头
+            ForEach(Array(outputSlots.enumerated()), id: \.element.id) { colIdx, outSlot in
+                OutputEndpointHeader(
+                    slot: outSlot,
+                    colIndex: colIdx,
+                    model: model,
+                    width: cellSize,
+                    height: outLabelHeight,
+                    onSelectEndpoint: { newId, newName, newType in
+                        outputSlots[colIdx].endpointId = newId
+                        outputSlots[colIdx].name = newName
+                        outputSlots[colIdx].typeDesc = newType
+                    }
+                )
+            }
+        }
+    }
+
+    private var cornerIndicator: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.white.opacity(0.03))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack {
+                    Spacer()
+                    Text(model.t("输出 (上)", "Out ↗"))
+                        .font(Theme.cnText(11.5, weight: .bold))
+                        .foregroundColor(Theme.amberWarn)
+                }
+                Divider().background(Color.white.opacity(0.1))
+                HStack {
+                    Text(model.t("输入 (左)", "↙ In"))
+                        .font(Theme.cnText(11.5, weight: .bold))
+                        .foregroundColor(Theme.neonCyan)
+                    Spacer()
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+        }
+        .frame(width: inLabelWidth, height: outLabelHeight)
+    }
+
+    private func matrixRow(rowIdx: Int, inSlot: MatrixSlot) -> some View {
+        HStack(spacing: 4) {
+            InputEndpointHeader(
+                slot: inSlot,
+                rowIndex: rowIdx,
+                model: model,
+                width: inLabelWidth,
+                height: cellSize,
+                onSelectEndpoint: { newId, newName, newType in
+                    inputSlots[rowIdx].endpointId = newId
+                    inputSlots[rowIdx].name = newName
+                    inputSlots[rowIdx].typeDesc = newType
+                }
+            )
+
+            ForEach(Array(outputSlots.enumerated()), id: \.element.id) { _, outSlot in
+                CrossPointCell(
+                    model: model,
+                    inSlot: inSlot,
+                    outSlot: outSlot,
+                    size: cellSize,
+                    onOpenAddSheet: onOpenAddSheet
+                )
+            }
+        }
+    }
+
+    private var bottomDashedRow: some View {
+        HStack(spacing: 4) {
+            MatrixDashedPlusCell(
+                width: inLabelWidth,
+                height: dashedBorderThickness,
+                label: "+ " + model.t("添加输入通道", "Add Input"),
+                tooltip: model.t("在左侧添加新的输入源行", "Add new input row")
+            ) {
+                appendInputSlot()
+            }
+
+            ForEach(0..<outputSlots.count, id: \.self) { _ in
+                MatrixDashedPlusCell(
+                    width: cellSize,
+                    height: dashedBorderThickness,
+                    label: "+",
+                    tooltip: model.t("在下方扩充通道", "Expand column")
+                ) {
+                    appendInputSlot()
+                }
+            }
+        }
+    }
+
+    private func appendInputSlot() {
+        let idx = inputSlots.count + 1
+        inputSlots.append(MatrixSlot(
+            endpointId: "",
+            name: model.t("输入通道 \(idx)", "Input \(idx)"),
+            typeDesc: model.t("点击配置", "Configure"),
+            iconName: "mic"
+        ))
+    }
+
+    private func insertInputSlot(at index: Int) {
+        let idx = inputSlots.count + 1
+        inputSlots.insert(MatrixSlot(
+            endpointId: "",
+            name: model.t("输入通道 \(idx)", "Input \(idx)"),
+            typeDesc: model.t("点击配置", "Configure"),
+            iconName: "mic"
+        ), at: index)
+    }
+
+    private func appendOutputSlot() {
+        let idx = outputSlots.count + 1
+        outputSlots.append(MatrixSlot(
+            endpointId: "",
+            name: model.t("输出通道 \(idx)", "Output \(idx)"),
+            typeDesc: model.t("点击配置", "Configure"),
+            iconName: "speaker.wave.2"
+        ))
+    }
+
+    private func insertOutputSlot(at index: Int) {
+        let idx = outputSlots.count + 1
+        outputSlots.insert(MatrixSlot(
+            endpointId: "",
+            name: model.t("输出通道 \(idx)", "Output \(idx)"),
+            typeDesc: model.t("点击配置", "Configure"),
+            iconName: "speaker.wave.2"
+        ), at: index)
+    }
+}
+
+// -------------------------------------------------------------
+// 外围虚线“+”号方格单元组件
+// -------------------------------------------------------------
+struct MatrixDashedPlusCell: View {
+    let width: CGFloat
+    let height: CGFloat
+    let label: String
+    let tooltip: String
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(isHovered ? Theme.neonCyan.opacity(0.08) : Color.white.opacity(0.015))
+
+                RoundedRectangle(cornerRadius: 5)
+                    .strokeBorder(
+                        style: StrokeStyle(lineWidth: 1.2, dash: [4, 3])
+                    )
+                    .foregroundColor(isHovered ? Theme.neonCyan : Color.white.opacity(0.22))
+
+                Text(label)
+                    .font(Theme.cnText(12.5, weight: .bold))
+                    .foregroundColor(isHovered ? Theme.neonCyan : Theme.textTertiary)
+            }
+            .frame(width: width, height: height)
+        }
+        .buttonStyle(.plain)
+        .onHover { h in
+            isHovered = h
+        }
+        .help(tooltip)
+    }
+}
+
+// -------------------------------------------------------------
+// 上侧输出列标头组件
+// -------------------------------------------------------------
+struct OutputEndpointHeader: View {
+    let slot: MatrixSlot
+    let colIndex: Int
+    @ObservedObject var model: AppModel
+    let width: CGFloat
+    let height: CGFloat
+    let onSelectEndpoint: (String, String, String) -> Void
+
+    var body: some View {
+        Menu {
+            Section(model.t("选择输出设备 (物理扬声器/耳机)", "Physical Outputs")) {
+                ForEach(model.devices.filter { $0.outChannels > 0 }, id: \.uid) { d in
+                    Button(d.name) {
+                        onSelectEndpoint(d.uid, d.name, model.t("物理输出", "Device Out"))
+                    }
+                }
+            }
+            Section(model.t("选择虚拟线缆输入端", "Virtual Cable Inputs")) {
+                ForEach(model.cables, id: \.cableId) { c in
+                    Button(c.name) {
+                        onSelectEndpoint(c.cableId, c.name, model.t("线缆输入", "Cable In"))
+                    }
+                }
+            }
+        } label: {
+            VStack(spacing: 4) {
+                HStack(spacing: 3) {
+                    Image(systemName: slot.endpointId.isEmpty ? "exclamationmark.circle" : "speaker.wave.2.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(slot.endpointId.isEmpty ? Theme.amberWarn : Theme.neonCyan)
+                    Text("Out \(colIndex + 1)")
+                        .font(Theme.monoDigit(11, weight: .bold))
+                        .foregroundColor(Theme.neonCyan)
+                }
+
+                Text(slot.name)
+                    .font(Theme.cnText(11, weight: .medium))
+                    .foregroundColor(Theme.textPrimary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+
+                ParamCapsule(text: slot.typeDesc, color: slot.endpointId.isEmpty ? Theme.amberWarn : Theme.textTertiary)
+            }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 5)
+            .frame(width: width, height: height)
+            .background(Color.white.opacity(0.025))
+            .cornerRadius(5)
+            .overlay(
+                RoundedRectangle(cornerRadius: 5)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .menuStyle(.borderlessButton)
+        .help(model.t("点击更换或分配此列输出端点：\(slot.name)", "Click to change output endpoint: \(slot.name)"))
+    }
+}
+
+// -------------------------------------------------------------
+// 左侧输入行标头组件
+// -------------------------------------------------------------
+struct InputEndpointHeader: View {
+    let slot: MatrixSlot
+    let rowIndex: Int
+    @ObservedObject var model: AppModel
+    let width: CGFloat
+    let height: CGFloat
+    let onSelectEndpoint: (String, String, String) -> Void
+
+    var body: some View {
+        Menu {
+            Section(model.t("物理输入设备", "Physical Inputs")) {
+                ForEach(model.devices.filter { $0.inChannels > 0 }, id: \.uid) { d in
+                    Button(d.name) {
+                        onSelectEndpoint(d.uid, d.name, model.t("物理输入", "Device In"))
+                    }
+                }
+            }
+            Section(model.t("虚拟线缆输出端", "Virtual Cable Outputs")) {
+                ForEach(model.cables, id: \.cableId) { c in
+                    Button(c.name) {
+                        onSelectEndpoint(c.cableId, c.name, model.t("线缆输出", "Cable Out"))
+                    }
+                }
+            }
+            Section(model.t("网络接收流", "Network Incoming Streams")) {
+                ForEach(model.metrics.rxStreams, id: \.name) { s in
+                    Button(s.name) {
+                        onSelectEndpoint(s.name, "VBAN [\(s.name)]", model.t("网络流", "VBAN RX"))
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 4) {
+                        Image(systemName: slot.endpointId.isEmpty ? "exclamationmark.circle" : "waveform")
+                            .font(.system(size: 10))
+                            .foregroundColor(slot.endpointId.isEmpty ? Theme.amberWarn : Theme.neonCyan)
+                        Text("In \(rowIndex + 1)")
+                            .font(Theme.monoDigit(11, weight: .bold))
+                            .foregroundColor(Theme.neonCyan)
+                    }
+
+                    Text(slot.name)
+                        .font(Theme.cnText(11.5, weight: .semibold))
+                        .foregroundColor(Theme.textPrimary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                ParamCapsule(text: slot.typeDesc, color: slot.endpointId.isEmpty ? Theme.amberWarn : Theme.textTertiary)
+            }
+            .padding(.horizontal, 8)
+            .frame(width: width, height: height)
+            .background(Color.white.opacity(0.025))
+            .cornerRadius(5)
+            .overlay(
+                RoundedRectangle(cornerRadius: 5)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .menuStyle(.borderlessButton)
+        .help(model.t("点击更换或分配此行输入端点：\(slot.name)", "Click to change input endpoint: \(slot.name)"))
+    }
+}
+
+// -------------------------------------------------------------
+// 交叉连接点单元格组件 (Cross-point Cell)
+// -------------------------------------------------------------
+struct CrossPointCell: View {
+    @ObservedObject var model: AppModel
+    let inSlot: MatrixSlot
+    let outSlot: MatrixSlot
+    let size: CGFloat
+    let onOpenAddSheet: () -> Void
+
+    @State private var isHovered = false
+
+    private var route: VbanRouteDesc? {
+        guard !inSlot.endpointId.isEmpty, !outSlot.endpointId.isEmpty else { return nil }
+        return model.routes.first(where: {
+            $0.srcId == inSlot.endpointId && $0.dstId == outSlot.endpointId
+        })
+    }
+
+    var body: some View {
+        Button(action: handleCellClick) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(backgroundColor)
+
+                RoundedRectangle(cornerRadius: 5)
+                    .stroke(borderColor, lineWidth: route != nil ? 1.5 : 1)
+
+                if let r = route {
+                    VStack(spacing: 3) {
+                        Image(systemName: r.enabled ? "link.circle.fill" : "link.circle")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundColor(r.enabled ? Theme.neonCyan : Theme.amberWarn)
+                            .shadow(color: (r.enabled ? Theme.neonCyan : Color.clear).opacity(0.6), radius: 4)
+
+                        Text(String(format: "%+.0fdB", (r.gain - 1.0) * 12.0))
+                            .font(Theme.monoDigit(10, weight: .bold))
+                            .foregroundColor(r.enabled ? Theme.neonCyan : Theme.textTertiary)
+                    }
+                } else {
+                    Circle()
+                        .fill(isHovered ? Theme.neonCyan.opacity(0.6) : Color.white.opacity(0.12))
+                        .frame(width: isHovered ? 8 : 4, height: isHovered ? 8 : 4)
+                }
+            }
+            .frame(width: size, height: size)
+        }
+        .buttonStyle(.plain)
+        .onHover { h in
+            isHovered = h
+        }
+        .help(tooltipText)
+    }
+
+    private var backgroundColor: Color {
+        if let r = route {
+            return r.enabled ? Theme.neonCyan.opacity(0.16) : Theme.amberWarn.opacity(0.12)
+        }
+        return isHovered ? Theme.neonCyan.opacity(0.08) : Color.white.opacity(0.015)
+    }
+
+    private var borderColor: Color {
+        if let r = route {
+            return r.enabled ? Theme.neonCyan.opacity(0.6) : Theme.amberWarn.opacity(0.5)
+        }
+        return isHovered ? Theme.neonCyan.opacity(0.35) : Color.white.opacity(0.06)
+    }
+
+    private var tooltipText: String {
+        if let r = route {
+            return model.t("路由已连接：\(r.srcName) -> \(r.dstName) (点击断开/删除)", "Connected: \(r.srcName) -> \(r.dstName) (Click to disconnect)")
+        }
+        if inSlot.endpointId.isEmpty || outSlot.endpointId.isEmpty {
+            return model.t("端点尚未分配，点击打开路由设置页", "Endpoints unassigned, click to open Route dialog")
+        }
+        return model.t("点击建立直通路由：\(inSlot.name) -> \(outSlot.name)", "Click to connect: \(inSlot.name) -> \(outSlot.name)")
+    }
+
+    private func handleCellClick() {
+        if let r = route {
+            model.removeRoute(id: r.routeId)
+        } else {
+            if !inSlot.endpointId.isEmpty && !outSlot.endpointId.isEmpty {
+                model.addRoute(
+                    srcId: inSlot.endpointId,
+                    srcName: inSlot.name,
+                    dstId: outSlot.endpointId,
+                    dstName: outSlot.name,
+                    gain: 1.0
+                )
+            } else {
+                onOpenAddSheet()
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// 视觉上无限的点阵画布背景 (Infinite Dot Grid Canvas)
+// -------------------------------------------------------------
+struct InfiniteDotGridCanvas: View {
+    var body: some View {
+        Canvas { context, size in
+            let step: CGFloat = 30
+            var x: CGFloat = 15
+            while x < size.width {
+                var y: CGFloat = 15
+                while y < size.height {
+                    let rect = CGRect(x: x - 1, y: y - 1, width: 2, height: 2)
+                    context.fill(Path(ellipseIn: rect), with: .color(Color.white.opacity(0.09)))
+                    y += step
+                }
+                x += step
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// 新建路由原生配置面板 (AddRouteSheet - 与 AddTxStreamSheet 严格统一)
+// -------------------------------------------------------------
+struct AddRouteSheet: View {
+    @ObservedObject var model: AppModel
+    @Binding var isPresented: Bool
+
+    @State private var srcId: String = ""
+    @State private var srcName: String = ""
+    @State private var dstId: String = ""
+    @State private var dstName: String = ""
+    @State private var gain: Float = 1.0
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            sheetHeader
+
+            Divider().background(Theme.borderSubtle)
+
+            sheetForm
+
+            Divider().background(Theme.borderSubtle)
+
+            sheetActions
+        }
+        .padding(20)
+        .frame(width: 460)
+        .background(Theme.windowBg)
+        .onAppear {
+            if srcId.isEmpty {
+                if let f = model.devices.first(where: { $0.inChannels > 0 }) {
+                    srcId = f.uid
+                    srcName = f.name
+                } else if let c = model.cables.first {
+                    srcId = c.cableId
+                    srcName = c.name
+                }
+            }
+            if dstId.isEmpty {
+                if let f = model.devices.first(where: { $0.outChannels > 0 }) {
+                    dstId = f.uid
+                    dstName = f.name
+                } else if let c = model.cables.first {
+                    dstId = c.cableId
+                    dstName = c.name
+                }
+            }
+        }
+    }
+
+    private var sheetHeader: some View {
+        HStack {
+            Image(systemName: "arrow.triangle.branch")
+                .font(.system(size: 16))
+                .foregroundColor(Theme.neonCyan)
+            Text(model.t("新建音频路由规则", "New Audio Route"))
+                .font(Theme.cnText(14, weight: .bold))
+                .foregroundColor(Theme.textPrimary)
+            Spacer()
+        }
+    }
+
+    private var sheetForm: some View {
+        VStack(spacing: 14) {
+            sourcePickerRow
+
+            destinationPickerRow
+
+            gainSliderRow
+        }
+    }
+
+    private var sourcePickerRow: some View {
+        HStack {
+            Text(model.t("输入源 (左):", "Source (In):"))
+                .font(Theme.cnText(12.5, weight: .semibold))
+                .frame(width: 100, alignment: .trailing)
+
+            Menu {
+                Section(model.t("物理输入设备", "Physical Inputs")) {
+                    ForEach(model.devices.filter { $0.inChannels > 0 }, id: \.uid) { d in
+                        Button(d.name) {
+                            srcId = d.uid
+                            srcName = d.name
+                        }
+                    }
+                }
+                Section(model.t("虚拟线缆输出", "Virtual Cable Outputs")) {
+                    ForEach(model.cables, id: \.cableId) { c in
+                        Button(c.name) {
+                            srcId = c.cableId
+                            srcName = c.name
+                        }
+                    }
+                }
+                Section(model.t("网络接收流", "Network Incoming Streams")) {
+                    ForEach(model.metrics.rxStreams, id: \.name) { s in
+                        Button(s.name) {
+                            srcId = s.name
+                            srcName = "VBAN [\(s.name)]"
+                        }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text(srcName.isEmpty ? model.t("选择输入源...", "Select Source...") : srcName)
+                        .font(Theme.cnText(12.5, weight: .medium))
+                    Spacer()
+                }
+            }
+            .menuStyle(.borderedButton)
+        }
+    }
+
+    private var destinationPickerRow: some View {
+        HStack {
+            Text(model.t("输出目标 (上):", "Destination (Out):"))
+                .font(Theme.cnText(12.5, weight: .semibold))
+                .frame(width: 100, alignment: .trailing)
+
+            Menu {
+                Section(model.t("物理输出设备", "Physical Outputs")) {
+                    ForEach(model.devices.filter { $0.outChannels > 0 }, id: \.uid) { d in
+                        Button(d.name) {
+                            dstId = d.uid
+                            dstName = d.name
+                        }
+                    }
+                }
+                Section(model.t("虚拟线缆输入", "Virtual Cable Inputs")) {
+                    ForEach(model.cables, id: \.cableId) { c in
+                        Button(c.name) {
+                            dstId = c.cableId
+                            dstName = c.name
+                        }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text(dstName.isEmpty ? model.t("选择输出目标...", "Select Destination...") : dstName)
+                        .font(Theme.cnText(12.5, weight: .medium))
+                    Spacer()
+                }
+            }
+            .menuStyle(.borderedButton)
+        }
+    }
+
+    private var gainSliderRow: some View {
+        HStack {
+            Text(model.t("通道增益:", "Gain:"))
+                .font(Theme.cnText(12.5, weight: .semibold))
+                .frame(width: 100, alignment: .trailing)
+
+            Slider(value: $gain, in: 0.0...2.0)
+
+            Text(String(format: "%+.1f dB", (gain - 1.0) * 12.0))
+                .font(Theme.monoDigit(12, weight: .bold))
+                .foregroundColor(Theme.neonCyan)
+                .frame(width: 64, alignment: .trailing)
+
+            Button(action: { gain = 1.0 }) {
+                Text("0 dB")
+                    .font(Theme.monoDigit(11, weight: .semibold))
+            }
+            .buttonStyle(.bordered)
+            .help(model.t("重置为 0dB 标准无衰减增益", "Reset to 0dB standard gain"))
+        }
+    }
+
+    private var sheetActions: some View {
+        HStack {
+            Spacer()
+            Button(model.t("取消", "Cancel")) {
+                isPresented = false
+            }
+            .keyboardShortcut(.cancelAction)
+
+            Button(action: {
+                guard !srcId.isEmpty, !dstId.isEmpty else { return }
+                model.addRoute(srcId: srcId, srcName: srcName, dstId: dstId, dstName: dstName, gain: gain)
+                isPresented = false
+            }) {
+                Text(model.t("创建并连接", "Create & Connect"))
+                    .font(Theme.cnText(12.5, weight: .semibold))
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Theme.neonCyan)
+            .keyboardShortcut(.defaultAction)
+            .disabled(srcId.isEmpty || dstId.isEmpty)
+        }
     }
 }
