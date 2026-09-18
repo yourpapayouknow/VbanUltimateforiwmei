@@ -206,14 +206,9 @@ struct RxStreamCard: View {
 
             // 卡片底栏：远端来源 + 吞吐速率 + 丢包抖动
             HStack(spacing: 8) {
-                HStack(spacing: 4) {
-                    Image(systemName: "network")
-                        .font(.system(size: 11))
-                        .foregroundColor(Theme.textTertiary)
-                    Text("\(strm.srcIp):\(strm.srcPort)")
-                        .font(Theme.monoDigit(12, weight: .semibold))
-                        .foregroundColor(Theme.textSecondary)
-                }
+                Text("\(strm.srcIp):\(strm.srcPort)")
+                    .font(Theme.monoDigit(12, weight: .semibold))
+                    .foregroundColor(Theme.textSecondary)
 
                 Spacer()
 
