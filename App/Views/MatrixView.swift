@@ -79,48 +79,38 @@ struct MatrixView: View {
                     viewMode = .list
                 }
             }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "list.bullet")
-                        .font(.system(size: 11, weight: .bold))
-                    Text(model.t("列表", "List"))
-                        .font(Theme.cnText(12, weight: .semibold))
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(viewMode == .list ? Theme.neonCyan.opacity(0.18) : Color.white.opacity(0.04))
-                .foregroundColor(viewMode == .list ? Theme.neonCyan : Theme.textSecondary)
-                .cornerRadius(4)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(viewMode == .list ? Theme.neonCyan.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1)
-                )
+                Image(systemName: "list.bullet")
+                    .font(.system(size: 12, weight: .bold))
+                    .frame(width: 28, height: 22)
+                    .background(viewMode == .list ? Theme.neonCyan.opacity(0.18) : Color.white.opacity(0.04))
+                    .foregroundColor(viewMode == .list ? Theme.neonCyan : Theme.textSecondary)
+                    .cornerRadius(4)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(viewMode == .list ? Theme.neonCyan.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1)
+                    )
             }
             .buttonStyle(.plain)
-            .help(model.t("以列表形式展示所有活动路由", "Show active routes in a list view"))
+            .help(model.t("列表视图", "List View"))
 
             Button(action: {
                 withAnimation(.easeInOut(duration: 0.15)) {
                     viewMode = .matrix
                 }
             }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "square.grid.2x2")
-                        .font(.system(size: 11, weight: .bold))
-                    Text(model.t("矩阵", "Matrix"))
-                        .font(Theme.cnText(12, weight: .semibold))
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(viewMode == .matrix ? Theme.neonCyan.opacity(0.18) : Color.white.opacity(0.04))
-                .foregroundColor(viewMode == .matrix ? Theme.neonCyan : Theme.textSecondary)
-                .cornerRadius(4)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(viewMode == .matrix ? Theme.neonCyan.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1)
-                )
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 12, weight: .bold))
+                    .frame(width: 28, height: 22)
+                    .background(viewMode == .matrix ? Theme.neonCyan.opacity(0.18) : Color.white.opacity(0.04))
+                    .foregroundColor(viewMode == .matrix ? Theme.neonCyan : Theme.textSecondary)
+                    .cornerRadius(4)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(viewMode == .matrix ? Theme.neonCyan.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1)
+                    )
             }
             .buttonStyle(.plain)
-            .help(model.t("以二维交叉矩阵画布展示音频路由", "Show audio routing on a cross-point matrix canvas"))
+            .help(model.t("矩阵画布视图", "Matrix View"))
         }
         .padding(2)
         .background(Color.white.opacity(0.03))
