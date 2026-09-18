@@ -74,13 +74,11 @@ struct CablesView: View {
     private var tableHeader: some View {
         HStack(spacing: 12) {
             Text(model.t("设备名称", "Device Name"))
-                .frame(width: 210, alignment: .leading)
+                .frame(width: 220, alignment: .leading)
             Text(model.t("设备标识", "Device Identifier"))
-                .frame(width: 280, alignment: .leading)
+                .frame(width: 360, alignment: .leading)
             Text(model.t("配置格式", "Configuration"))
-                .frame(width: 150, alignment: .leading)
-            Text(model.t("驱动总线", "Driver Bus"))
-                .frame(width: 110, alignment: .center)
+                .frame(width: 160, alignment: .leading)
             Spacer()
             Text(model.t("操作", "Action"))
                 .frame(width: 64, alignment: .center)
@@ -130,30 +128,19 @@ struct CablesView: View {
                     .foregroundColor(Theme.textPrimary)
                     .lineLimit(1)
             }
-            .frame(width: 210, alignment: .leading)
+            .frame(width: 220, alignment: .leading)
 
             Text("com.iwmei.vbanultimate.audio.\(cbl.cableId)")
                 .font(Theme.monoDigit(12, weight: .medium))
                 .foregroundColor(Theme.textTertiary)
-                .frame(width: 280, alignment: .leading)
+                .frame(width: 360, alignment: .leading)
                 .lineLimit(1)
 
             HStack(spacing: 4) {
                 ParamCapsule(text: "\(cbl.channels)CH")
                 ParamCapsule(text: "\(cbl.sampleRate / 1000)kHz")
             }
-            .frame(width: 150, alignment: .leading)
-
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(Theme.meterGreen)
-                    .frame(width: 6, height: 6)
-                Text(model.t("双向回环", "Loopback"))
-                    .font(Theme.cnText(12, weight: .semibold))
-                    .foregroundColor(Theme.meterGreen)
-            }
-            .frame(width: 110, alignment: .center)
-            .help(model.t("CoreAudio HAL AudioServerPlugIn 虚拟音频驱动总线", "CoreAudio HAL AudioServerPlugIn driver bus"))
+            .frame(width: 160, alignment: .leading)
 
             Spacer()
 
