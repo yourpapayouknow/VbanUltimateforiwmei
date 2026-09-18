@@ -28,6 +28,9 @@
 @implementation VbanRouteDesc
 @end
 
+@implementation VbanConflictProcess
+@end
+
 @interface VbanBridge () {
     std::shared_ptr<vban::UdpSck>     sck_;
     std::shared_ptr<vban::StrmDmx>    dmx_;
@@ -130,6 +133,47 @@
 
 - (uint16_t)boundPort {
     return bound_port_.load();
+}
+
+- (NSArray<VbanConflictProcess *> *)scanPortOccupants:(uint16_t)port {
+    // 扫描占用目标UDP端口的外部进程
+    NSMutableArray *res = [NSMutableArray array];
+    char cmd[128];
+    snprintf(cmd, sizeof(cmd), "/usr/sbin/lsof -nP -iUDP:%u -Fpcf 2>/dev/null", port);
+    FILE *fp = popen(cmd, "r");
+    if (!fp) return res;
+
+    char line[512];
+    pid_t cur_pid = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        size_t len = strlen(line);
+        while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r')) {
+            line[--len] = '\0';
+        }
+        if (line[0] == 'p') {
+            cur_pid = (pid_t)atoi(line + 1);
+        } else if (line[0] == 'c' && cur_pid > 0) {
+            NSString *pName = [NSString stringWithUTF8String:line + 1];
+            VbanConflictProcess *p = [[VbanConflictProcess alloc] init];
+            p.pid = cur_pid;
+            p.name = pName;
+            [res addObject:p];
+            cur_pid = 0;
+        }
+    }
+    pclose(fp);
+    return res;
+}
+
+- (BOOL)killProcessByPid:(pid_t)pid {
+    // 终止指定冲突进程以释放端口
+    if (pid <= 1) return NO;
+    kill(pid, SIGTERM);
+    usleep(150000);
+    if (kill(pid, 0) == 0) {
+        kill(pid, SIGKILL);
+    }
+    return YES;
 }
 
 - (void)stopAll {

@@ -70,6 +70,12 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL enabled;
 @end
 
+// 冲突进程描述结构
+@interface VbanConflictProcess : NSObject
+@property (nonatomic, assign) pid_t pid;
+@property (nonatomic, copy) NSString *name;
+@end
+
 // 桥接层中央管理类
 @interface VbanBridge : NSObject
 
@@ -81,6 +87,10 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)stopAll;
 - (BOOL)isPortConflict;
 - (uint16_t)boundPort;
+
+// 端口占用排查与解除
+- (NSArray<VbanConflictProcess *> *)scanPortOccupants:(uint16_t)port;
+- (BOOL)killProcessByPid:(pid_t)pid;
 
 // 虚拟音频线缆管理
 - (NSArray<VbanCableDesc *> *)getCables;

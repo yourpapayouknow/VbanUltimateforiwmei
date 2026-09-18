@@ -62,44 +62,41 @@ struct StreamsView: View {
                 // 左列：接收流 (RX)
                 VStack(spacing: 0) {
                     if model.isPortConflict {
-                        VStack(spacing: 12) {
+                        VStack(spacing: 14) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 30))
+                                .font(.system(size: 32))
                                 .foregroundColor(Theme.alertRed)
 
-                            Text(model.t("UDP 端口 \(model.udpPort) 被占用", "UDP Port \(model.udpPort) In Use"))
-                                .font(Theme.cnText(15, weight: .bold))
+                            Text(model.t("UDP \(model.udpPort) 端口冲突", "UDP \(model.udpPort) Port Conflict"))
+                                .font(Theme.cnText(15.5, weight: .bold))
                                 .foregroundColor(Theme.textPrimary)
 
-                            Text(model.t("检测到 UDP \(model.udpPort) 已被其他应用（如 VBAN Talkie）独占。\n遵循规则未做降级换绑，当前无法接收外部音频流。", "Port \(model.udpPort) is occupied by another app (e.g. VBAN Talkie).\nNo port fallback performed; currently cannot receive streams."))
-                                .font(Theme.cnText(12.5, weight: .medium))
-                                .foregroundColor(Theme.textSecondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 20)
-
                             Button(action: {
-                                model.retryBindPort()
+                                model.diagnosePortConflict()
                             }) {
                                 HStack(spacing: 6) {
-                                    Image(systemName: "arrow.clockwise")
-                                    Text(model.t("退出冲突应用后点击重试", "Retry Binding Port"))
+                                    Image(systemName: "stethoscope")
+                                    Text(model.t("排查", "Diagnose"))
                                 }
                                 .font(Theme.cnText(12.5, weight: .semibold))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 5)
                             }
                             .buttonStyle(.borderedProminent)
                             .tint(Theme.amberWarn)
-                            .padding(.top, 4)
+                            .help(model.t("扫描占用 UDP \(model.udpPort) 的进程，协助一键释放并接管", "Scan processes using UDP \(model.udpPort) and help release"))
                         }
-                        .padding(.vertical, 28)
-                        .padding(.horizontal, 16)
+                        .padding(.vertical, 32)
+                        .padding(.horizontal, 24)
                         .background(Color.white.opacity(0.025))
                         .cornerRadius(8)
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
-                                .stroke(Theme.alertRed.opacity(0.4), lineWidth: 1)
+                                .stroke(Theme.alertRed.opacity(0.35), lineWidth: 1)
                         )
-                        .padding(16)
+                        .padding(20)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .help(model.t("UDP \(model.udpPort) 端口已被外部音频应用占用，当前未绑定端口以确保通信规范。点击“排查”可扫描并解除占用。", "UDP \(model.udpPort) is occupied by another audio app. Currently unbound to comply with transmission specs. Click 'Diagnose' to resolve."))
                     } else if model.metrics.rxStreams.isEmpty {
                         VStack(spacing: 8) {
                             Image(systemName: "waveform.badge.magnifyingglass")
@@ -156,6 +153,29 @@ struct StreamsView: View {
         .background(Theme.windowBg)
         .sheet(isPresented: $showAddTxSheet) {
             AddTxStreamSheet(model: model, isPresented: $showAddTxSheet)
+        }
+        .alert(
+            model.t("端口占用排查", "Port Conflict Diagnosis"),
+            isPresented: $model.showConflictDiagAlert
+        ) {
+            if !model.conflictProcesses.isEmpty {
+                Button(model.t("终止进程并接管端口", "Terminate & Bind Port"), role: .destructive) {
+                    model.resolveConflictAndRestart()
+                }
+                Button(model.t("取消", "Cancel"), role: .cancel) {}
+            } else {
+                Button(model.t("重试绑定", "Retry Bind")) {
+                    model.retryBindPort()
+                }
+                Button(model.t("完成", "Done"), role: .cancel) {}
+            }
+        } message: {
+            if !model.conflictProcesses.isEmpty {
+                let list = model.conflictProcesses.map { "\($0.name) (PID \($0.pid))" }.joined(separator: ", ")
+                Text(model.t("检测到以下应用正在占用 UDP \(model.udpPort) 端口：\n\n\(list)\n\n是否终止该进程以释放端口并启动 VBAN 接收服务？", "Detected process occupying UDP \(model.udpPort):\n\n\(list)\n\nTerminate it to free port and start VBAN service?"))
+            } else {
+                Text(model.t("未检测到常驻进程占用 UDP \(model.udpPort)。可能已被外部程序释放，是否立即尝试重新绑定？", "No persistent process detected on UDP \(model.udpPort). Retry binding now?"))
+            }
         }
     }
 }

@@ -40,8 +40,8 @@ struct MainContainerView: View {
             ToolbarItem(placement: .automatic) {
                 HStack(spacing: 8) {
                     if model.isPortConflict {
-                        ParamCapsule(text: "UDP \(model.udpPort) " + model.t("冲突占用", "Conflict"), color: Theme.alertRed)
-                            .help(model.t("UDP \(model.udpPort) 端口被其他应用（如 VBAN Talkie）独占，无法接收外部音频流", "UDP port \(model.udpPort) is occupied by another app. Cannot receive streams."))
+                        ParamCapsule(text: "UDP -", color: Theme.textTertiary)
+                            .help(model.t("当前未绑定端口（UDP \(model.udpPort) 端口冲突被占用）", "Port not bound (UDP \(model.udpPort) port conflict)"))
                     } else {
                         ParamCapsule(text: "UDP \(model.udpPort)", color: Theme.textSecondary)
                             .help(model.t("VBAN 标准网络监听端口", "Standard VBAN network listening port"))

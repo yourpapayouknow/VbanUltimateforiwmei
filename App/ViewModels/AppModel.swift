@@ -94,6 +94,8 @@ final class AppModel: ObservableObject {
     @Published var isAudioRunning: Bool = false
     @Published var isPortConflict: Bool = false
     @Published var udpPort: String = "6980"
+    @Published var conflictProcesses: [VbanConflictProcess] = []
+    @Published var showConflictDiagAlert: Bool = false
 
     private var timer: Timer?
     private let bridge = VbanBridge.shared()
@@ -131,6 +133,20 @@ final class AppModel: ObservableObject {
         let p = UInt16(udpPort) ?? 6980
         _ = bridge.startAll(withPort: p)
         pollMetrics()
+    }
+
+    func diagnosePortConflict() {
+        let p = UInt16(udpPort) ?? 6980
+        conflictProcesses = bridge.scanPortOccupants(p)
+        showConflictDiagAlert = true
+    }
+
+    func resolveConflictAndRestart() {
+        for proc in conflictProcesses {
+            _ = bridge.killProcess(byPid: proc.pid)
+        }
+        usleep(250000)
+        retryBindPort()
     }
 
     func refreshAll() {
