@@ -30,7 +30,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .matrix:   return lang == .chinese ? "路由矩阵" : "Matrix"
         case .cables:   return lang == .chinese ? "虚拟线缆" : "Cables"
         case .monitor:  return lang == .chinese ? "监控诊断" : "Monitoring"
-        case .settings: return lang == .chinese ? "设置与概览" : "Settings"
+        case .settings: return lang == .chinese ? "设置" : "Settings"
         }
     }
 
