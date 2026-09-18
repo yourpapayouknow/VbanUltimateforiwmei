@@ -660,8 +660,12 @@ struct OutputEndpointHeader: View {
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(Theme.neonCyan)
                         .frame(width: 22, height: 22)
-                        .background(Color.white.opacity(0.06))
+                        .background(Theme.neonCyan.opacity(0.12))
                         .cornerRadius(4)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(Theme.neonCyan.opacity(0.85), lineWidth: 1.2)
+                        )
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
@@ -720,7 +724,7 @@ struct InputEndpointHeader: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 6) {
+            VStack(spacing: 4) {
                 Menu {
                     Section(model.t("物理输入设备", "Physical Inputs")) {
                         ForEach(model.devices.filter { $0.inChannels > 0 }, id: \.uid) { d in
@@ -748,8 +752,12 @@ struct InputEndpointHeader: View {
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(Theme.neonCyan)
                         .frame(width: 22, height: 22)
-                        .background(Color.white.opacity(0.06))
+                        .background(Theme.neonCyan.opacity(0.12))
                         .cornerRadius(4)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(Theme.neonCyan.opacity(0.85), lineWidth: 1.2)
+                        )
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
