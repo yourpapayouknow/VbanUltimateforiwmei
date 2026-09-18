@@ -479,9 +479,6 @@ struct AddCableSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Image(systemName: "cable.connector")
-                    .font(.system(size: 16))
-                    .foregroundColor(Theme.neonCyan)
                 Text(model.t("新建虚拟音频线缆", "New Virtual Audio Cable"))
                     .font(Theme.cnText(14, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
