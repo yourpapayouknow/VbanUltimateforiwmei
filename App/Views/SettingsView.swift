@@ -74,27 +74,28 @@ struct SettingsView: View {
         .background(Color.white.opacity(0.03))
     }
 
+    // 大节分割线
+    private var sectionDivider: some View {
+        Divider()
+            .background(Color.white.opacity(0.04))
+            .padding(.bottom, 14)
+    }
+
     // 常规设置列
     private var generalSettingsColumn: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 displayLanguageSection
 
-                Divider().background(Theme.borderSubtle)
-                    .padding(.top, 6)
-                    .padding(.bottom, 12)
+                sectionDivider
 
                 networkTransmissionSection
 
-                Divider().background(Theme.borderSubtle)
-                    .padding(.top, 6)
-                    .padding(.bottom, 12)
+                sectionDivider
 
                 virtualDriverSection
 
-                Divider().background(Theme.borderSubtle)
-                    .padding(.top, 6)
-                    .padding(.bottom, 12)
+                sectionDivider
 
                 telemetrySection
             }
