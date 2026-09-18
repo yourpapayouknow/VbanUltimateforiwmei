@@ -77,18 +77,24 @@ struct SettingsView: View {
     // 常规设置列
     private var generalSettingsColumn: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 0) {
                 displayLanguageSection
 
                 Divider().background(Theme.borderSubtle)
+                    .padding(.top, 6)
+                    .padding(.bottom, 12)
 
                 networkTransmissionSection
 
                 Divider().background(Theme.borderSubtle)
+                    .padding(.top, 6)
+                    .padding(.bottom, 12)
 
                 virtualDriverSection
 
                 Divider().background(Theme.borderSubtle)
+                    .padding(.top, 6)
+                    .padding(.bottom, 12)
 
                 telemetrySection
             }
