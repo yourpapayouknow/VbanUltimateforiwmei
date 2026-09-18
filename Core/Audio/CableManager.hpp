@@ -80,12 +80,27 @@ public:
 
     // 重命名指定虚拟线缆
     bool rnmcbl(const std::string& id, const std::string& new_name) {
-        // 修改指定ID线缆名称并同步保存
         if (new_name.empty()) return false;
         std::lock_guard<std::mutex> lock(mtx_);
         for (auto& c : cbls_) {
             if (c.id == id) {
                 c.name = new_name;
+                svcfg();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // 更新虚拟线缆全量配置参数
+    bool updcbl(const std::string& id, const std::string& name, uint32_t chs, uint32_t sr) {
+        if (id.empty() || name.empty() || chs == 0 || sr == 0) return false;
+        std::lock_guard<std::mutex> lock(mtx_);
+        for (auto& c : cbls_) {
+            if (c.id == id) {
+                c.name = name;
+                c.chs = chs;
+                c.sr = sr;
                 svcfg();
                 return true;
             }

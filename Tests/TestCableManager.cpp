@@ -31,13 +31,17 @@ void tstcblmgr() {
         assert(list[0].id == "vban_a");
         assert(list[0].name == "VBAN - PC A");
 
-        // 重命名
+        // 重命名与全属性更新测试
         assert(mgr.rnmcbl("vban_c", "VBAN - Studio Music"));
+        assert(mgr.updcbl("vban_d", "VBAN - Talkback 8CH", 8, 96000));
         // 删除
         assert(mgr.rmvcbl("vban_b"));
 
         list = mgr.gtcbls();
         assert(list.size() == 3);
+        assert(list[2].chs == 8);
+        assert(list[2].sr == 96000);
+        assert(list[2].name == "VBAN - Talkback 8CH");
     }
 
     // 重新从磁盘载入验证持久化
@@ -47,7 +51,9 @@ void tstcblmgr() {
         assert(list.size() == 3);
         assert(list[0].name == "VBAN - PC A");
         assert(list[1].name == "VBAN - Studio Music");
-        assert(list[2].name == "VBAN - Talkback");
+        assert(list[2].name == "VBAN - Talkback 8CH");
+        assert(list[2].chs == 8);
+        assert(list[2].sr == 96000);
     }
 
     std::filesystem::remove_all(test_dir);

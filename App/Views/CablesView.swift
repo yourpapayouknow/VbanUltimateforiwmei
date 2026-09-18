@@ -7,6 +7,8 @@ struct CablesView: View {
     @State private var showAddCableSheet = false
     @State private var showEditCableSheet = false
     @State private var selectedCable: VbanCableDesc? = nil
+    @State private var cableToDelete: VbanCableDesc? = nil
+    @State private var showDeleteConfirmAlert = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -32,6 +34,23 @@ struct CablesView: View {
             if let cable = selectedCable {
                 EditCableSheet(model: model, cable: cable, isPresented: $showEditCableSheet)
             }
+        }
+        .alert(isPresented: $showDeleteConfirmAlert) {
+            let count = cableToDelete != nil ? model.relatedRoutes(for: cableToDelete!).count : 0
+            let name = cableToDelete?.name ?? ""
+            return Alert(
+                title: Text(model.t("确认删除虚拟音频线缆？", "Delete Virtual Audio Cable?")),
+                message: Text(model.t(
+                    "线缆 “\(name)” 当前在路由矩阵中连接了 \(count) 条关联音频路由。删除该线缆将同时级联断开并清除这些路由，此操作不可撤销。",
+                    "Cable '\(name)' is currently connected to \(count) routing rules. Deleting this cable will also disconnect and clear these routes."
+                )),
+                primaryButton: .destructive(Text(model.t("删除线缆与路由", "Delete Cable & Routes"))) {
+                    if let cbl = cableToDelete {
+                        model.removeCable(id: cbl.cableId)
+                    }
+                },
+                secondaryButton: .cancel(Text(model.t("取消", "Cancel")))
+            )
         }
     }
 
@@ -159,7 +178,13 @@ struct CablesView: View {
 
                 // 删除按钮
                 Button(action: {
-                    model.removeCable(id: cbl.cableId)
+                    let related = model.relatedRoutes(for: cbl)
+                    if !related.isEmpty {
+                        cableToDelete = cbl
+                        showDeleteConfirmAlert = true
+                    } else {
+                        model.removeCable(id: cbl.cableId)
+                    }
                 }) {
                     Image(systemName: "trash")
                         .font(.system(size: 11))
@@ -445,13 +470,15 @@ struct AddCableSheet: View {
     }
 }
 
-// 重命名虚拟线缆弹窗
+// 修改虚拟线缆配置弹窗
 struct EditCableSheet: View {
     @ObservedObject var model: AppModel
     let cable: VbanCableDesc
     @Binding var isPresented: Bool
 
     @State private var name = ""
+    @State private var channels: UInt32 = 2
+    @State private var sampleRate: UInt32 = 48000
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -459,7 +486,7 @@ struct EditCableSheet: View {
                 Image(systemName: "pencil")
                     .font(.system(size: 16))
                     .foregroundColor(Theme.neonCyan)
-                Text(model.t("重命名虚拟音频线缆", "Rename Virtual Audio Cable"))
+                Text(model.t("修改虚拟音频线缆", "Edit Virtual Audio Cable"))
                     .font(Theme.cnText(14, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
                 Spacer()
@@ -489,15 +516,29 @@ struct EditCableSheet: View {
                 }
 
                 HStack {
-                    Text(model.t("配置格式:", "Format:"))
+                    Text(model.t("声道配置:", "Channels:"))
                         .font(Theme.cnText(12.5, weight: .semibold))
-                        .foregroundColor(Theme.textSecondary)
                         .frame(width: 90, alignment: .trailing)
-                    HStack(spacing: 4) {
-                        ParamCapsule(text: "\(cable.channels)CH")
-                        ParamCapsule(text: "\(cable.sampleRate / 1000)kHz")
+                    Picker("", selection: $channels) {
+                        Text(model.t("单声道 (1CH)", "Mono (1CH)")).tag(UInt32(1))
+                        Text(model.t("立体声 (2CH)", "Stereo (2CH)")).tag(UInt32(2))
+                        Text(model.t("四声道 (4CH)", "Quad (4CH)")).tag(UInt32(4))
+                        Text(model.t("八声道 (8CH)", "8-Channel (8CH)")).tag(UInt32(8))
                     }
-                    Spacer()
+                    .pickerStyle(MenuPickerStyle())
+                }
+
+                HStack {
+                    Text(model.t("硬件采样率:", "Sample Rate:"))
+                        .font(Theme.cnText(12.5, weight: .semibold))
+                        .frame(width: 90, alignment: .trailing)
+                    Picker("", selection: $sampleRate) {
+                        Text("44.1 kHz").tag(UInt32(44100))
+                        Text("48.0 kHz").tag(UInt32(48000))
+                        Text("96.0 kHz").tag(UInt32(96000))
+                        Text("192.0 kHz").tag(UInt32(192000))
+                    }
+                    .pickerStyle(MenuPickerStyle())
                 }
             }
 
@@ -512,7 +553,7 @@ struct EditCableSheet: View {
 
                 Button(action: {
                     guard !name.isEmpty else { return }
-                    model.renameCable(id: cable.cableId, newName: name)
+                    model.updateCable(id: cable.cableId, name: name, channels: channels, sampleRate: sampleRate)
                     isPresented = false
                 }) {
                     Text(model.t("保存修改", "Save"))
@@ -528,6 +569,8 @@ struct EditCableSheet: View {
         .background(Theme.windowBg)
         .onAppear {
             name = cable.name
+            channels = cable.channels
+            sampleRate = cable.sampleRate
         }
     }
 }

@@ -184,9 +184,13 @@ static AudioStreamBasicDescription bldfmt(UInt32 chs, Float64 sr) {
     return f;
 }
 
+// 广播级专业音频支持的标准硬件采样率集合
+static const std::vector<Float64> kSupportedSampleRates = {
+    44100.0, 48000.0, 88200.0, 96000.0, 176400.0, 192000.0
+};
+
 // 依据配置构造虚拟设备实例
 static DevEnt blddev(const CblCfg& cfg) {
-    // 创建虚拟设备并绑定输入输出流与回环句柄
     auto ring  = std::make_shared<CblRing>(cfg.chs);
     auto hndlr = std::make_shared<CblIOHndlr>(ring);
 
@@ -198,20 +202,42 @@ static DevEnt blddev(const CblCfg& cfg) {
     params.SampleRate   = cfg.sr;
     params.ChannelCount = cfg.chs;
     params.EnableMixing = true;
+    params.ClockIsStable = true;
+    params.ClockAlgorithm = kAudioDeviceClockAlgorithmSimpleIIR;
+    params.ClockDomain  = 0;
 
     auto dev = std::make_shared<aspl::Device>(gCtx, params);
     dev->SetIOHandler(hndlr);
     dev->SetControlHandler(hndlr);
 
+    std::vector<AudioValueRange> dev_rates;
+    for (Float64 r : kSupportedSampleRates) {
+        dev_rates.push_back({r, r});
+    }
+    dev->SetAvailableSampleRatesAsync(dev_rates);
+
     aspl::StreamParameters out_strm;
     out_strm.Direction = aspl::Direction::Output;
     out_strm.Format = bldfmt(params.ChannelCount, params.SampleRate);
-    dev->AddStreamWithControlsAsync(out_strm);
+    auto out_strm_obj = dev->AddStreamWithControlsAsync(out_strm);
 
     aspl::StreamParameters in_strm;
     in_strm.Direction = aspl::Direction::Input;
     in_strm.Format = bldfmt(params.ChannelCount, params.SampleRate);
-    dev->AddStreamWithControlsAsync(in_strm);
+    auto in_strm_obj = dev->AddStreamWithControlsAsync(in_strm);
+
+    std::vector<AudioStreamRangedDescription> stream_formats;
+    for (Float64 r : kSupportedSampleRates) {
+        AudioStreamRangedDescription desc{};
+        desc.mFormat = bldfmt(cfg.chs, r);
+        desc.mSampleRateRange.mMinimum = r;
+        desc.mSampleRateRange.mMaximum = r;
+        stream_formats.push_back(desc);
+    }
+    out_strm_obj->SetAvailablePhysicalFormatsAsync(stream_formats);
+    out_strm_obj->SetAvailableVirtualFormatsAsync(stream_formats);
+    in_strm_obj->SetAvailablePhysicalFormatsAsync(stream_formats);
+    in_strm_obj->SetAvailableVirtualFormatsAsync(stream_formats);
 
     return {dev, hndlr, cfg.chs, cfg.sr};
 }

@@ -220,6 +220,11 @@
     return cbl_->rnmcbl([cId UTF8String], [newName UTF8String]);
 }
 
+- (BOOL)updateCableWithId:(NSString *)cId name:(NSString *)name channels:(uint32_t)ch sampleRate:(uint32_t)sr {
+    // 更新虚拟线缆全量配置
+    return cbl_->updcbl([cId UTF8String], [name UTF8String], ch, sr);
+}
+
 - (NSArray<VbanAudioDevDesc *> *)getDevices {
     // 枚举系统 CoreAudio 物理和虚拟设备
     NSMutableArray *arr = [NSMutableArray array];

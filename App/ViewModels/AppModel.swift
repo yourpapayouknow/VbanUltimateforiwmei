@@ -217,19 +217,54 @@ final class AppModel: ObservableObject {
         let ok = bridge.addCable(withId: id, name: name, channels: channels, sampleRate: sampleRate)
         if ok {
             cables = bridge.getCables()
+            devices = bridge.getDevices()
         }
         return ok
     }
 
-    func removeCable(id: String) {
-        if bridge.removeCable(withId: id) {
-            cables = bridge.getCables()
+    // 查询与指定线缆关联的矩阵路由
+    func relatedRoutes(for cable: VbanCableDesc) -> [VbanRouteDesc] {
+        return routes.filter {
+            $0.srcId == cable.cableId || $0.dstId == cable.cableId ||
+            $0.srcName == cable.name || $0.dstName == cable.name
         }
     }
 
-    func renameCable(id: String, newName: String) {
-        if bridge.renameCable(withId: id, newName: newName) {
+    // 级联删除虚拟线缆及其关联路由
+    func removeCable(id: String) {
+        let oldCable = cables.first(where: { $0.cableId == id })
+        if bridge.removeCable(withId: id) {
+            if let cbl = oldCable {
+                let toRemove = routes.filter {
+                    $0.srcId == id || $0.dstId == id ||
+                    $0.srcName == cbl.name || $0.dstName == cbl.name
+                }
+                for r in toRemove {
+                    _ = bridge.removeRoute(withId: r.routeId)
+                }
+            }
             cables = bridge.getCables()
+            routes = bridge.getRoutes()
+            devices = bridge.getDevices()
+        }
+    }
+
+    // 更新虚拟线缆配置并同步路由端点
+    func updateCable(id: String, name: String, channels: UInt32, sampleRate: UInt32) {
+        let oldCable = cables.first(where: { $0.cableId == id })
+        if bridge.updateCable(withId: id, name: name, channels: channels, sampleRate: sampleRate) {
+            if let cbl = oldCable, cbl.name != name {
+                // 同步更新发送流中引用的旧名称
+                for i in 0..<txStreams.count {
+                    if txStreams[i].sourceName == cbl.name {
+                        txStreams[i].sourceName = name
+                    }
+                }
+                saveTxStreams()
+            }
+            cables = bridge.getCables()
+            routes = bridge.getRoutes()
+            devices = bridge.getDevices()
         }
     }
 

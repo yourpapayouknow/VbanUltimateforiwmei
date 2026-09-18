@@ -98,6 +98,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)addCableWithId:(NSString *)cId name:(NSString *)name channels:(uint32_t)ch sampleRate:(uint32_t)sr;
 - (BOOL)removeCableWithId:(NSString *)cId;
 - (BOOL)renameCableWithId:(NSString *)cId newName:(NSString *)newName;
+- (BOOL)updateCableWithId:(NSString *)cId name:(NSString *)name channels:(uint32_t)ch sampleRate:(uint32_t)sr;
 
 // 系统设备枚举
 - (NSArray<VbanAudioDevDesc *> *)getDevices;
