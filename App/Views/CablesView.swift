@@ -199,8 +199,16 @@ struct CablesView: View {
             .frame(width: 64, alignment: .center)
         }
         .padding(.horizontal, 16)
-        .frame(height: 38)
+        .frame(height: rowHeight(for: cbl.channels))
         .background(idx % 2 == 0 ? Color.clear : Theme.rowAltBg)
+    }
+
+    // 自适应行高
+    private func rowHeight(for channels: UInt32) -> CGFloat {
+        if channels <= 2 { return 42 }
+        if channels == 4 { return 64 }
+        if channels == 6 { return 84 }
+        return 106
     }
 }
 
@@ -216,13 +224,13 @@ struct CableLevelMeterView: View {
     @State private var timer: Timer? = nil
 
     private var displayChannelCount: Int {
-        max(1, min(Int(channels), 8))
+        min(8, max(1, Int(channels)))
     }
 
     var body: some View {
         HStack(spacing: 8) {
             // 多声道横向水平条阵列
-            VStack(spacing: displayChannelCount > 2 ? 2 : 3) {
+            VStack(spacing: channelSpacing) {
                 ForEach(0..<displayChannelCount, id: \.self) { chIdx in
                     channelMeterRow(chIdx: chIdx)
                 }
@@ -258,11 +266,12 @@ struct CableLevelMeterView: View {
 
     // 单声道电平指示行
     private func channelMeterRow(chIdx: Int) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 5) {
             Text(channelLabel(for: chIdx))
-                .font(Theme.monoDigit(9, weight: .bold))
+                .font(Theme.monoDigit(channels >= 6 ? 8.0 : 9.0, weight: .bold))
                 .foregroundColor(Theme.textTertiary)
-                .frame(width: 10, alignment: .leading)
+                .frame(width: channels >= 4 ? 22 : 12, height: channelBarHeight, alignment: .trailing)
+                .lineLimit(1)
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -292,17 +301,44 @@ struct CableLevelMeterView: View {
                     }
                 }
             }
-            .frame(height: displayChannelCount > 2 ? 4.5 : 7)
+            .frame(height: channelBarHeight)
         }
+        .frame(height: channelBarHeight)
     }
 
-    // 声道标签映射
+    // 动态条间距
+    private var channelSpacing: CGFloat {
+        if displayChannelCount <= 2 { return 3.0 }
+        if displayChannelCount == 4 { return 3.0 }
+        if displayChannelCount == 6 { return 2.5 }
+        return 2.2
+    }
+
+    // 动态条高度
+    private var channelBarHeight: CGFloat {
+        if displayChannelCount <= 2 { return 7.0 }
+        if displayChannelCount == 4 { return 6.5 }
+        if displayChannelCount == 6 { return 6.0 }
+        return 5.5
+    }
+
+    // 专业音频声道标签映射
     private func channelLabel(for chIdx: Int) -> String {
-        if channels == 1 {
+        switch channels {
+        case 1:
             return "M"
-        } else if channels == 2 {
+        case 2:
             return chIdx == 0 ? "L" : "R"
-        } else {
+        case 4:
+            let labels = ["L", "R", "Ls", "Rs"]
+            return chIdx < labels.count ? labels[chIdx] : "\(chIdx + 1)"
+        case 6:
+            let labels = ["L", "R", "C", "LFE", "Ls", "Rs"]
+            return chIdx < labels.count ? labels[chIdx] : "\(chIdx + 1)"
+        case 8:
+            let labels = ["L", "R", "C", "LFE", "Ls", "Rs", "Rls", "Rrs"]
+            return chIdx < labels.count ? labels[chIdx] : "\(chIdx + 1)"
+        default:
             return "\(chIdx + 1)"
         }
     }
@@ -414,8 +450,9 @@ struct AddCableSheet: View {
                     Picker("", selection: $channels) {
                         Text(model.t("单声道 (1CH)", "Mono (1CH)")).tag(UInt32(1))
                         Text(model.t("立体声 (2CH)", "Stereo (2CH)")).tag(UInt32(2))
-                        Text(model.t("四声道 (4CH)", "Quad (4CH)")).tag(UInt32(4))
-                        Text(model.t("八声道 (8CH)", "8-Channel (8CH)")).tag(UInt32(8))
+                        Text(model.t("四声道 (4CH / Quad)", "Quad (4CH)")).tag(UInt32(4))
+                        Text(model.t("六声道 (6CH / 5.1)", "5.1 Surround (6CH)")).tag(UInt32(6))
+                        Text(model.t("八声道 (8CH / 7.1)", "7.1 Surround (8CH)")).tag(UInt32(8))
                     }
                     .pickerStyle(MenuPickerStyle())
                 }
@@ -522,8 +559,9 @@ struct EditCableSheet: View {
                     Picker("", selection: $channels) {
                         Text(model.t("单声道 (1CH)", "Mono (1CH)")).tag(UInt32(1))
                         Text(model.t("立体声 (2CH)", "Stereo (2CH)")).tag(UInt32(2))
-                        Text(model.t("四声道 (4CH)", "Quad (4CH)")).tag(UInt32(4))
-                        Text(model.t("八声道 (8CH)", "8-Channel (8CH)")).tag(UInt32(8))
+                        Text(model.t("四声道 (4CH / Quad)", "Quad (4CH)")).tag(UInt32(4))
+                        Text(model.t("六声道 (6CH / 5.1)", "5.1 Surround (6CH)")).tag(UInt32(6))
+                        Text(model.t("八声道 (8CH / 7.1)", "7.1 Surround (8CH)")).tag(UInt32(8))
                     }
                     .pickerStyle(MenuPickerStyle())
                 }
