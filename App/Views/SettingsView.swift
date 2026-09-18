@@ -96,30 +96,104 @@ struct SettingsView: View {
         }
     }
 
-    // 界面显示语言设置
+    @Namespace private var settingsSwitcherAnimation
+
+    // 界面显示语言与外观样式设置
     private var displayLanguageSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(model.t("界面与显示", "Interface & Display"))
                 .font(Theme.cnText(12.5, weight: .bold))
                 .foregroundColor(Theme.neonCyan)
 
+            // 语言设置
             HStack(spacing: 16) {
-                Text(model.t("界面显示语言", "Display Language"))
+                Text(model.t("语言", "Language"))
                     .font(Theme.cnText(13, weight: .semibold))
                     .foregroundColor(Theme.textPrimary)
 
                 Spacer()
 
-                Picker("", selection: $model.language) {
+                HStack(spacing: 0) {
                     ForEach(AppLanguage.allCases) { lang in
-                        Text(lang.displayName).tag(lang)
+                        slidingCapsuleItem(
+                            title: lang.displayName,
+                            isSelected: model.language == lang,
+                            matchedId: "langHighlight"
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.16)) {
+                                model.language = lang
+                            }
+                        }
                     }
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 180)
+                .padding(2)
+                .background(Color.black.opacity(0.35))
+                .cornerRadius(6)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
                 .help(model.t("切换应用程序界面显示语言", "Switch application display language"))
             }
+
+            Divider().background(Color.white.opacity(0.04))
+
+            // 样式设置
+            HStack(spacing: 16) {
+                Text(model.t("样式", "Appearance"))
+                    .font(Theme.cnText(13, weight: .semibold))
+                    .foregroundColor(Theme.textPrimary)
+
+                Spacer()
+
+                HStack(spacing: 0) {
+                    ForEach(AppThemeStyle.allCases) { style in
+                        slidingCapsuleItem(
+                            title: style.title(for: model.language),
+                            isSelected: model.themeStyle == style,
+                            matchedId: "themeHighlight"
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.16)) {
+                                model.themeStyle = style
+                            }
+                        }
+                    }
+                }
+                .padding(2)
+                .background(Color.black.opacity(0.35))
+                .cornerRadius(6)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
+                .help(model.t("切换应用程序外观样式（深色、浅色、跟随系统）", "Switch appearance mode (Dark, Light, System)"))
+            }
         }
+    }
+
+    // 滑块切换单元
+    private func slidingCapsuleItem(title: String, isSelected: Bool, matchedId: String, itemWidth: CGFloat = 68, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            ZStack {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Theme.neonCyan.opacity(0.18))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(Theme.neonCyan.opacity(0.45), lineWidth: 1)
+                        )
+                        .matchedGeometryEffect(id: matchedId, in: settingsSwitcherAnimation)
+                }
+
+                Text(title)
+                    .font(Theme.cnText(11.5, weight: isSelected ? .bold : .medium))
+                    .foregroundColor(isSelected ? Theme.neonCyan : Theme.textTertiary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(width: itemWidth, height: 22)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // 网络通信与传输参数
@@ -151,8 +225,7 @@ struct SettingsView: View {
                     }) {
                         Text(ipCopied ? model.t("已复制", "Copied") : model.t("复制", "Copy"))
                             .font(Theme.cnText(10.5, weight: .semibold))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
+                            .frame(width: 48, height: 20)
                             .background(ipCopied ? Theme.meterGreen.opacity(0.2) : Color.white.opacity(0.04))
                             .foregroundColor(ipCopied ? Theme.meterGreen : Theme.neonCyan)
                             .cornerRadius(3)
@@ -181,8 +254,9 @@ struct SettingsView: View {
                     model.retryBindPort()
                 })
                 .textFieldStyle(RoundedBorderTextFieldStyle())
-                .font(Theme.monoDigit(12.5, weight: .semibold))
-                .frame(width: 85)
+                .font(Theme.monoDigit(12, weight: .semibold))
+                .multilineTextAlignment(.center)
+                .frame(width: 120, height: 24)
             }
             .help(model.t("网络监听端口，官方标准为6980。同一网络或同一机器存在多个实例时可自定义端口实现隔离。修改后按回车重新绑定。", "Official standard VBAN UDP port is 6980. Change this to isolate multiple instances on the same host or network. Press Enter to rebind."))
 
@@ -198,8 +272,9 @@ struct SettingsView: View {
 
                 TextField("", text: $model.username)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .font(Theme.monoDigit(12.5, weight: .semibold))
-                    .frame(width: 140)
+                    .font(Theme.monoDigit(12, weight: .semibold))
+                    .multilineTextAlignment(.center)
+                    .frame(width: 120, height: 24)
             }
             .help(model.t("用户节点名称与电台呼号标识，最大长度十六字符。发送流默认使用此标识，方便对端设备识别通信来源。", "Station username and node identifier (max 16 characters). Transmitted streams use this label by default so remote receivers recognize this node."))
 
@@ -219,7 +294,7 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.menu)
-                .frame(width: 110)
+                .frame(width: 120)
             }
             .help(model.t("网络传输质量预设：\(model.networkQuality.desc(for: model.language))。动态调整抗抖动平滑缓冲深度，避免网络丢包产生爆音。", "Network transmission quality preset: \(model.networkQuality.desc(for: model.language)). Dynamically adjusts jitter buffer depth to prevent underruns."))
 
@@ -239,7 +314,7 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.menu)
-                .frame(width: 110)
+                .frame(width: 120)
             }
             .help(model.t("音频缓冲调度大小：\(model.bufferingDesc(model.bufferingFrames))。包含标称十毫秒封包帧长与低延迟音频调度块大小。", "Audio buffer scheduling size: \(model.bufferingDesc(model.bufferingFrames)). Covers nominal 10ms packet frames and low-latency audio blocks."))
         }
@@ -271,15 +346,14 @@ struct SettingsView: View {
                     model.refreshAll()
                 }) {
                     Text(model.metrics.driverInstalled ? model.t("重新安装驱动", "Reinstall Driver") : model.t("安装虚拟驱动", "Install Driver"))
-                        .font(Theme.cnText(12, weight: .semibold))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
+                        .font(Theme.cnText(11.5, weight: .semibold))
+                        .frame(width: 106, height: 22)
                         .background(Theme.neonCyan.opacity(0.18))
                         .foregroundColor(Theme.neonCyan)
                         .cornerRadius(4)
                         .overlay(
                             RoundedRectangle(cornerRadius: 4)
-                                .stroke(Theme.neonCyan.opacity(0.4), lineWidth: 1)
+                                .stroke(Theme.neonCyan.opacity(0.85), lineWidth: 1.2)
                         )
                 }
                 .buttonStyle(.plain)

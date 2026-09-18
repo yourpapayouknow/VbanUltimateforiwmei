@@ -15,6 +15,31 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
 }
 
+// 界面外观样式枚举
+enum AppThemeStyle: String, CaseIterable, Identifiable {
+    case system = "system"
+    case dark = "dark"
+    case light = "light"
+
+    var id: String { rawValue }
+
+    func title(for lang: AppLanguage) -> String {
+        switch self {
+        case .system: return lang == .chinese ? "跟随系统" : "System"
+        case .dark:   return lang == .chinese ? "深色" : "Dark"
+        case .light:  return lang == .chinese ? "浅色" : "Light"
+        }
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .dark:   return .dark
+        case .light:  return .light
+        }
+    }
+}
+
 enum AppTab: String, CaseIterable, Identifiable {
     case streams
     case matrix
@@ -112,6 +137,19 @@ final class AppModel: ObservableObject {
     }() {
         didSet {
             UserDefaults.standard.set(language.rawValue, forKey: "app_language")
+        }
+    }
+
+    // 界面外观样式（默认跟随系统）
+    @Published var themeStyle: AppThemeStyle = {
+        if let saved = UserDefaults.standard.string(forKey: "app_theme_style"),
+           let style = AppThemeStyle(rawValue: saved) {
+            return style
+        }
+        return .system
+    }() {
+        didSet {
+            UserDefaults.standard.set(themeStyle.rawValue, forKey: "app_theme_style")
         }
     }
 
