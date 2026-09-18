@@ -20,6 +20,7 @@ struct MatrixView: View {
 
     @State private var viewMode: MatrixViewMode = .list
     @State private var showAddRouteSheet = false
+    @Namespace private var viewSwitcherAnimation
 
     // 矩阵输入输出槽位
     @State private var inputSlots: [MatrixSlot] = []
@@ -58,7 +59,7 @@ struct MatrixView: View {
     // 顶部操作工具栏
     private var topToolbar: some View {
         HStack(spacing: 12) {
-            // 方形胶囊视图切换器
+            // 视图切换胶囊
             viewModeCapsule
 
             Spacer()
@@ -71,54 +72,49 @@ struct MatrixView: View {
         .background(Color.white.opacity(0.03))
     }
 
-    // 方形胶囊视图切换器
+    // 视图切换胶囊
     private var viewModeCapsule: some View {
-        HStack(spacing: 2) {
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    viewMode = .list
-                }
-            }) {
-                Image(systemName: "list.bullet")
-                    .font(.system(size: 12, weight: .bold))
-                    .frame(width: 28, height: 22)
-                    .background(viewMode == .list ? Theme.neonCyan.opacity(0.18) : Color.white.opacity(0.04))
-                    .foregroundColor(viewMode == .list ? Theme.neonCyan : Theme.textSecondary)
-                    .cornerRadius(4)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 4)
-                            .stroke(viewMode == .list ? Theme.neonCyan.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1)
-                    )
-            }
-            .buttonStyle(.plain)
-            .help(model.t("列表视图", "List View"))
-
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    viewMode = .matrix
-                }
-            }) {
-                Image(systemName: "square.grid.2x2")
-                    .font(.system(size: 12, weight: .bold))
-                    .frame(width: 28, height: 22)
-                    .background(viewMode == .matrix ? Theme.neonCyan.opacity(0.18) : Color.white.opacity(0.04))
-                    .foregroundColor(viewMode == .matrix ? Theme.neonCyan : Theme.textSecondary)
-                    .cornerRadius(4)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 4)
-                            .stroke(viewMode == .matrix ? Theme.neonCyan.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1)
-                    )
-            }
-            .buttonStyle(.plain)
-            .help(model.t("矩阵画布视图", "Matrix View"))
+        HStack(spacing: 0) {
+            viewModeItem(mode: .list, icon: "list.bullet", tooltip: model.t("列表视图", "List View"))
+            viewModeItem(mode: .matrix, icon: "square.grid.2x2", tooltip: model.t("矩阵画布视图", "Matrix View"))
         }
         .padding(2)
-        .background(Color.white.opacity(0.03))
+        .background(Color.black.opacity(0.35))
         .cornerRadius(6)
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
+    }
+
+    // 视图切换单元
+    private func viewModeItem(mode: MatrixViewMode, icon: String, tooltip: String) -> some View {
+        Button(action: {
+            withAnimation(.easeInOut(duration: 0.16)) {
+                viewMode = mode
+            }
+        }) {
+            ZStack {
+                if viewMode == mode {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Theme.neonCyan.opacity(0.18))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(Theme.neonCyan.opacity(0.45), lineWidth: 1)
+                        )
+                        .matchedGeometryEffect(id: "viewModeActiveHighlight", in: viewSwitcherAnimation)
+                }
+
+                Image(systemName: icon)
+                    .font(.system(size: 11.5, weight: .bold))
+                    .foregroundColor(viewMode == mode ? Theme.neonCyan : Theme.textTertiary)
+                    .frame(width: 26, height: 20)
+            }
+            .frame(width: 26, height: 20)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(tooltip)
     }
 
     // 建立路由按钮
