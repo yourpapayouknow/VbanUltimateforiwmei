@@ -100,12 +100,13 @@ struct SettingsView: View {
 
     // 界面显示语言与外观样式设置
     private var displayLanguageSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 0) {
             Text(model.t("界面与显示", "Interface & Display"))
                 .font(Theme.cnText(12.5, weight: .bold))
                 .foregroundColor(Theme.neonCyan)
+                .padding(.bottom, 8)
 
-            // 语言设置
+            // 语言设置行
             HStack(spacing: 16) {
                 Text(model.t("语言", "Language"))
                     .font(Theme.cnText(13, weight: .semibold))
@@ -135,10 +136,11 @@ struct SettingsView: View {
                 )
                 .help(model.t("切换应用程序界面显示语言", "Switch application display language"))
             }
+            .frame(height: 40)
 
             Divider().background(Color.white.opacity(0.04))
 
-            // 样式设置
+            // 样式设置行
             HStack(spacing: 16) {
                 Text(model.t("样式", "Appearance"))
                     .font(Theme.cnText(13, weight: .semibold))
@@ -168,6 +170,7 @@ struct SettingsView: View {
                 )
                 .help(model.t("切换应用程序外观样式（深色、浅色、跟随系统）", "Switch appearance mode (Dark, Light, System)"))
             }
+            .frame(height: 40)
         }
     }
 
@@ -198,10 +201,11 @@ struct SettingsView: View {
 
     // 网络通信与传输参数
     private var networkTransmissionSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 0) {
             Text(model.t("网络与传输参数", "Network & Transmission"))
                 .font(Theme.cnText(12.5, weight: .bold))
                 .foregroundColor(Theme.neonCyan)
+                .padding(.bottom, 8)
 
             // 主机网络地址行
             HStack(spacing: 16) {
@@ -238,6 +242,7 @@ struct SettingsView: View {
                     .help(model.t("复制本机网络地址到剪贴板，方便在对端发送设备中填入", "Copy host IP to clipboard for configuring remote transmitter"))
                 }
             }
+            .frame(height: 40)
             .help(model.t("本机局域网通信地址。当远端设备向本机发送音频流时，须在对端输入此地址。点击可复制至剪贴板。", "Local host IP address on your LAN. When remote devices send audio to this machine, enter this IP on the transmitter. Click to copy."))
 
             Divider().background(Color.white.opacity(0.04))
@@ -258,6 +263,7 @@ struct SettingsView: View {
                 .multilineTextAlignment(.center)
                 .frame(width: 120, height: 24)
             }
+            .frame(height: 40)
             .help(model.t("网络监听端口，官方标准为6980。同一网络或同一机器存在多个实例时可自定义端口实现隔离。修改后按回车重新绑定。", "Official standard VBAN UDP port is 6980. Change this to isolate multiple instances on the same host or network. Press Enter to rebind."))
 
             Divider().background(Color.white.opacity(0.04))
@@ -276,6 +282,7 @@ struct SettingsView: View {
                     .multilineTextAlignment(.center)
                     .frame(width: 120, height: 24)
             }
+            .frame(height: 40)
             .help(model.t("用户节点名称与电台呼号标识，最大长度十六字符。发送流默认使用此标识，方便对端设备识别通信来源。", "Station username and node identifier (max 16 characters). Transmitted streams use this label by default so remote receivers recognize this node."))
 
             Divider().background(Color.white.opacity(0.04))
@@ -296,6 +303,7 @@ struct SettingsView: View {
                 .pickerStyle(.menu)
                 .frame(width: 120)
             }
+            .frame(height: 40)
             .help(model.t("网络传输质量预设：\(model.networkQuality.desc(for: model.language))。动态调整抗抖动平滑缓冲深度，避免网络丢包产生爆音。", "Network transmission quality preset: \(model.networkQuality.desc(for: model.language)). Dynamically adjusts jitter buffer depth to prevent underruns."))
 
             Divider().background(Color.white.opacity(0.04))
@@ -316,16 +324,18 @@ struct SettingsView: View {
                 .pickerStyle(.menu)
                 .frame(width: 120)
             }
+            .frame(height: 40)
             .help(model.t("音频缓冲调度大小：\(model.bufferingDesc(model.bufferingFrames))。包含标称十毫秒封包帧长与低延迟音频调度块大小。", "Audio buffer scheduling size: \(model.bufferingDesc(model.bufferingFrames)). Covers nominal 10ms packet frames and low-latency audio blocks."))
         }
     }
 
     // 虚拟音频驱动管理
     private var virtualDriverSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 0) {
             Text(model.t("虚拟音频驱动", "Virtual Audio Driver"))
                 .font(Theme.cnText(12.5, weight: .bold))
                 .foregroundColor(Theme.neonCyan)
+                .padding(.bottom, 8)
 
             HStack(spacing: 12) {
                 StatusLed(isActive: model.metrics.driverInstalled)
@@ -359,6 +369,7 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
                 .help(model.t("部署 AudioServerPlugIn 驱动至 macOS 系统 HAL 目录（需要管理员权限）", "Deploy AudioServerPlugIn driver into system HAL directory (requires admin)"))
             }
+            .frame(height: 40)
         }
     }
 
