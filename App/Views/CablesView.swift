@@ -199,20 +199,21 @@ struct CablesView: View {
             .frame(width: 64, alignment: .center)
         }
         .padding(.horizontal, 16)
-        .frame(height: rowHeight(for: cbl.channels))
+        .frame(height: 50)
         .background(idx % 2 == 0 ? Color.clear : Theme.rowAltBg)
-    }
-
-    // 自适应行高
-    private func rowHeight(for channels: UInt32) -> CGFloat {
-        if channels <= 2 { return 42 }
-        if channels == 4 { return 64 }
-        if channels == 6 { return 84 }
-        return 106
     }
 }
 
-// 50Hz多声道横向音频电平表组件
+// 声道配对模型
+struct MeterChannelPair: Identifiable {
+    var id: String { "\(leftIdx ?? -1)_\(rightIdx ?? -1)" }
+    let leftIdx: Int?
+    let leftLabel: String
+    let rightIdx: Int?
+    let rightLabel: String
+}
+
+// 50Hz双列声场横向音频电平表组件
 struct CableLevelMeterView: View {
     let cableId: String
     let channels: UInt32
@@ -223,37 +224,126 @@ struct CableLevelMeterView: View {
     @State private var peakDb: CGFloat = -999.0
     @State private var timer: Timer? = nil
 
+    // 显示声道数量约束
     private var displayChannelCount: Int {
         min(8, max(1, Int(channels)))
     }
 
+    // 声场对阵配对生成
+    private var channelPairs: [MeterChannelPair] {
+        switch channels {
+        case 1:
+            return [MeterChannelPair(leftIdx: 0, leftLabel: "M", rightIdx: nil, rightLabel: "")]
+        case 2:
+            return [MeterChannelPair(leftIdx: 0, leftLabel: "L", rightIdx: 1, rightLabel: "R")]
+        case 4:
+            return [
+                MeterChannelPair(leftIdx: 0, leftLabel: "L", rightIdx: 1, rightLabel: "R"),
+                MeterChannelPair(leftIdx: 2, leftLabel: "Ls", rightIdx: 3, rightLabel: "Rs")
+            ]
+        case 6:
+            return [
+                MeterChannelPair(leftIdx: 0, leftLabel: "L", rightIdx: 1, rightLabel: "R"),
+                MeterChannelPair(leftIdx: 2, leftLabel: "C", rightIdx: 3, rightLabel: "LFE"),
+                MeterChannelPair(leftIdx: 4, leftLabel: "Ls", rightIdx: 5, rightLabel: "Rs")
+            ]
+        case 8:
+            return [
+                MeterChannelPair(leftIdx: 0, leftLabel: "L", rightIdx: 1, rightLabel: "R"),
+                MeterChannelPair(leftIdx: 2, leftLabel: "C", rightIdx: 3, rightLabel: "LFE"),
+                MeterChannelPair(leftIdx: 4, leftLabel: "Ls", rightIdx: 5, rightLabel: "Rs"),
+                MeterChannelPair(leftIdx: 6, leftLabel: "Rls", rightIdx: 7, rightLabel: "Rrs")
+            ]
+        default:
+            var pairs: [MeterChannelPair] = []
+            let count = Int(channels)
+            for i in stride(from: 0, to: count, by: 2) {
+                let rIdx = (i + 1 < count) ? (i + 1) : nil
+                pairs.append(MeterChannelPair(
+                    leftIdx: i,
+                    leftLabel: "\(i + 1)",
+                    rightIdx: rIdx,
+                    rightLabel: rIdx != nil ? "\(rIdx! + 1)" : ""
+                ))
+            }
+            return pairs
+        }
+    }
+
+    // 单条高度
+    private var channelBarHeight: CGFloat {
+        let pairCount = channelPairs.count
+        if pairCount <= 1 { return 7.0 }
+        if pairCount == 2 { return 6.0 }
+        if pairCount == 3 { return 5.5 }
+        return 4.8
+    }
+
+    // 行间距
+    private var channelSpacing: CGFloat {
+        let pairCount = channelPairs.count
+        if pairCount <= 1 { return 0.0 }
+        if pairCount == 2 { return 5.0 }
+        if pairCount == 3 { return 3.5 }
+        return 2.5
+    }
+
+    // 电平槽总高度
+    private var totalMeterHeight: CGFloat {
+        let count = CGFloat(channelPairs.count)
+        return count * channelBarHeight + max(0, count - 1) * channelSpacing
+    }
+
     var body: some View {
         HStack(spacing: 8) {
-            // 多声道横向水平条阵列
-            VStack(spacing: channelSpacing) {
-                ForEach(0..<displayChannelCount, id: \.self) { chIdx in
-                    channelMeterRow(chIdx: chIdx)
+            // 双列声场对阵横条阵列
+            if channels == 1 {
+                singleChannelItem(idx: 0, label: "M", customWidth: 276, labelWidth: 18)
+                    .frame(width: 276, height: channelBarHeight)
+            } else {
+                HStack(spacing: 0) {
+                    // 左声道列
+                    VStack(spacing: channelSpacing) {
+                        ForEach(channelPairs) { pair in
+                            singleChannelItem(idx: pair.leftIdx, label: pair.leftLabel, customWidth: 132, labelWidth: 20)
+                        }
+                    }
+                    .frame(width: 132)
+
+                    // 声场中轴分隔线
+                    Rectangle()
+                        .fill(Color.white.opacity(0.10))
+                        .frame(width: 1, height: totalMeterHeight)
+                        .padding(.horizontal, 5.5)
+
+                    // 右声道列
+                    VStack(spacing: channelSpacing) {
+                        ForEach(channelPairs) { pair in
+                            singleChannelItem(idx: pair.rightIdx, label: pair.rightLabel, customWidth: 132, labelWidth: 20)
+                        }
+                    }
+                    .frame(width: 132)
                 }
+                .frame(width: 276)
             }
-            .frame(width: 268)
 
             // 实时分贝数值或无信号指示
             if peakDb <= -90.0 {
                 Text("-∞ dB")
                     .font(Theme.monoDigit(11, weight: .medium))
                     .foregroundColor(Theme.textTertiary)
-                    .frame(width: 58, alignment: .trailing)
+                    .frame(width: 56, alignment: .trailing)
             } else {
                 Text(String(format: "%+.1f dB", peakDb))
                     .font(Theme.monoDigit(11, weight: .bold))
                     .foregroundColor(peakDb > -3.0 ? Theme.alertRed : (peakDb > -12.0 ? Theme.amberWarn : Theme.meterGreen))
-                    .frame(width: 58, alignment: .trailing)
+                    .frame(width: 56, alignment: .trailing)
             }
         }
-        .frame(width: 340, alignment: .leading)
+        .frame(width: 340, height: 50, alignment: .leading)
         .help(model.t(
-            "50Hz 采样横向多声道电平表 · 峰值: \(peakDb <= -90 ? "-∞" : String(format: "%.1f", peakDb)) dBFS",
-            "50Hz Sampling Multi-Channel Level Meter · Peak: \(peakDb <= -90 ? "-∞" : String(format: "%.1f", peakDb)) dBFS"
+            "双列声场横向电平表 · 峰值: \(peakDb <= -90 ? "-∞" : String(format: "%.1f", peakDb)) dBFS",
+            "Dual-Column Level Meter · Peak: \(peakDb <= -90 ? "-∞" : String(format: "%.1f", peakDb)) dBFS"
         ))
         .onAppear {
             initLevels()
@@ -264,83 +354,50 @@ struct CableLevelMeterView: View {
         }
     }
 
-    // 单声道电平指示行
-    private func channelMeterRow(chIdx: Int) -> some View {
-        HStack(spacing: 5) {
-            Text(channelLabel(for: chIdx))
-                .font(Theme.monoDigit(channels >= 6 ? 8.0 : 9.0, weight: .bold))
-                .foregroundColor(Theme.textTertiary)
-                .frame(width: channels >= 4 ? 22 : 12, height: channelBarHeight, alignment: .trailing)
-                .lineLimit(1)
+    // 单声道微条单元
+    private func singleChannelItem(idx: Int?, label: String, customWidth: CGFloat, labelWidth: CGFloat) -> some View {
+        HStack(spacing: 4) {
+            if let idx = idx {
+                Text(label)
+                    .font(Theme.monoDigit(label.count >= 3 ? 7.5 : 8.5, weight: .bold))
+                    .foregroundColor(Theme.textTertiary)
+                    .frame(width: labelWidth, height: channelBarHeight, alignment: .trailing)
+                    .lineLimit(1)
 
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 1.5)
-                        .fill(Color.black.opacity(0.4))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 1.5)
-                                .stroke(Color.white.opacity(0.06), lineWidth: 0.8)
-                        )
-
-                    let lvl = chIdx < channelLevels.count ? channelLevels[chIdx] : 0.0
-                    if lvl > 0.001 {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 1.5)
-                            .fill(
-                                LinearGradient(
-                                    stops: [
-                                        .init(color: Theme.meterGreen, location: 0.0),
-                                        .init(color: Theme.meterGreen, location: 0.70),
-                                        .init(color: Theme.amberWarn, location: 0.88),
-                                        .init(color: Theme.alertRed, location: 1.0)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
+                            .fill(Color.black.opacity(0.4))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 1.5)
+                                    .stroke(Color.white.opacity(0.06), lineWidth: 0.8)
                             )
-                            .frame(width: max(2.0, geo.size.width * min(1.0, lvl)))
+
+                        let lvl = idx < channelLevels.count ? channelLevels[idx] : 0.0
+                        if lvl > 0.001 {
+                            RoundedRectangle(cornerRadius: 1.5)
+                                .fill(
+                                    LinearGradient(
+                                        stops: [
+                                            .init(color: Theme.meterGreen, location: 0.0),
+                                            .init(color: Theme.meterGreen, location: 0.70),
+                                            .init(color: Theme.amberWarn, location: 0.88),
+                                            .init(color: Theme.alertRed, location: 1.0)
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: max(2.0, geo.size.width * min(1.0, lvl)))
+                        }
                     }
                 }
+                .frame(height: channelBarHeight)
+            } else {
+                Spacer().frame(height: channelBarHeight)
             }
-            .frame(height: channelBarHeight)
         }
-        .frame(height: channelBarHeight)
-    }
-
-    // 动态条间距
-    private var channelSpacing: CGFloat {
-        if displayChannelCount <= 2 { return 3.0 }
-        if displayChannelCount == 4 { return 3.0 }
-        if displayChannelCount == 6 { return 2.5 }
-        return 2.2
-    }
-
-    // 动态条高度
-    private var channelBarHeight: CGFloat {
-        if displayChannelCount <= 2 { return 7.0 }
-        if displayChannelCount == 4 { return 6.5 }
-        if displayChannelCount == 6 { return 6.0 }
-        return 5.5
-    }
-
-    // 专业音频声道标签映射
-    private func channelLabel(for chIdx: Int) -> String {
-        switch channels {
-        case 1:
-            return "M"
-        case 2:
-            return chIdx == 0 ? "L" : "R"
-        case 4:
-            let labels = ["L", "R", "Ls", "Rs"]
-            return chIdx < labels.count ? labels[chIdx] : "\(chIdx + 1)"
-        case 6:
-            let labels = ["L", "R", "C", "LFE", "Ls", "Rs"]
-            return chIdx < labels.count ? labels[chIdx] : "\(chIdx + 1)"
-        case 8:
-            let labels = ["L", "R", "C", "LFE", "Ls", "Rs", "Rls", "Rrs"]
-            return chIdx < labels.count ? labels[chIdx] : "\(chIdx + 1)"
-        default:
-            return "\(chIdx + 1)"
-        }
+        .frame(width: customWidth, height: channelBarHeight)
     }
 
     // 启动50Hz采样调度
