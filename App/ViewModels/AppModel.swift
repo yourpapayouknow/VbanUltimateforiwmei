@@ -166,11 +166,9 @@ final class AppModel: ObservableObject {
     private func loadTxStreams() {
         if let data = UserDefaults.standard.data(forKey: "vban_tx_streams"),
            let list = try? JSONDecoder().decode([VbanTxStreamDesc].self, from: data) {
-            txStreams = list
+            txStreams = list.filter { $0.id != "tx_1" }
         } else {
-            txStreams = [
-                VbanTxStreamDesc(id: "tx_1", name: "MasterOut", sourceName: "VBAN Cable A", targetIp: "192.168.1.50", targetPort: 6980, sampleRate: 48000, channels: 2, bitDepth: 24, enabled: true, kbps: 2304, packetsPerSec: 188)
-            ]
+            txStreams = []
         }
     }
 

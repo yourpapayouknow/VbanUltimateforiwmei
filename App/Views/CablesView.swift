@@ -302,39 +302,32 @@ struct CableLevelMeterView: View {
 
     // 50Hz多声道真实信号采样计算
     private func updateLevels() {
-        // 检查当前线缆是否在路由矩阵或发送流中存在真实音频信号
-        let activeAsTxSource = model.txStreams.first(where: { $0.sourceName == cableName && $0.enabled && $0.kbps > 0 })
         let activeIncomingRoute = model.routes.first(where: {
             $0.dstName == cableName && $0.enabled && !$0.muted
         })
 
-        // 真实信号活跃度分析
         var targetEnergy: CGFloat = 0.0
-        if let tx = activeAsTxSource {
-            let maxThroughput: CGFloat = CGFloat(tx.sampleRate * tx.channels * tx.bitDepth) / 1000.0
-            let ratio = maxThroughput > 0 ? CGFloat(tx.kbps) / maxThroughput : 0.0
-            targetEnergy = max(0.0, min(1.0, ratio * 0.75))
-        } else if let r = activeIncomingRoute {
-            if let rx = model.metrics.rxStreams.first(where: { $0.name == r.srcName && $0.kbps > 0 }) {
+        if let r = activeIncomingRoute {
+            if let rx = model.metrics.rxStreams.first(where: {
+                $0.name == r.srcName && $0.status == "Active" && $0.kbps > 0 && $0.packetsPerSec > 0
+            }) {
                 let maxThroughput: CGFloat = CGFloat(rx.sampleRate * rx.channels * rx.bitDepth) / 1000.0
                 let ratio = maxThroughput > 0 ? CGFloat(rx.kbps) / maxThroughput : 0.0
-                targetEnergy = max(0.0, min(1.0, ratio * CGFloat(r.gain) * 0.8))
-            } else if model.isAudioRunning {
-                targetEnergy = 0.45 * CGFloat(r.gain)
+                targetEnergy = max(0.0, min(1.0, ratio * CGFloat(r.gain) * 0.75))
             }
         }
 
-        // 50Hz 采样多声道物理平滑滤波
         let count = displayChannelCount
         var updated: [CGFloat] = []
         var maxLvl: CGFloat = 0.0
 
         for i in 0..<count {
             let old = i < channelLevels.count ? channelLevels[i] : 0.0
-            if targetEnergy <= 0.001 {
-                let next = max(0.0, old * 0.85)
-                updated.append(next)
-                if next > maxLvl { maxLvl = next }
+            if targetEnergy <= 0.0001 {
+                let next = old * 0.7
+                let finalLvl = next < 0.005 ? 0.0 : next
+                updated.append(finalLvl)
+                if finalLvl > maxLvl { maxLvl = finalLvl }
             } else {
                 let chFactor: CGFloat = (count == 2 && i == 1) ? 0.94 : 1.0
                 let target = min(1.0, targetEnergy * chFactor)

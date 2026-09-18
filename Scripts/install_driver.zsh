@@ -14,10 +14,19 @@ fi
 
 echo "Installing VBAN Ultimate Virtual Audio Driver..."
 
-# 确保配置目录存在且具有普通写权限
+# 确保配置目录存在并具备读写权限
 if [ ! -d "$CFG_DIR" ]; then
-    sudo mkdir -p "$CFG_DIR"
-    sudo chmod 777 "$CFG_DIR"
+    mkdir -p "$CFG_DIR"
+fi
+chmod 777 "$CFG_DIR"
+
+# 同步既有用户配置
+USER_CFG="$HOME/Library/Application Support/VBANUltimate/cables.plist"
+if [ -f "$USER_CFG" ] && [ ! -f "$CFG_DIR/cables.plist" ]; then
+    cp "$USER_CFG" "$CFG_DIR/cables.plist"
+fi
+if [ -f "$CFG_DIR/cables.plist" ]; then
+    chmod 666 "$CFG_DIR/cables.plist"
 fi
 
 # 复制驱动插件到 HAL 目录
