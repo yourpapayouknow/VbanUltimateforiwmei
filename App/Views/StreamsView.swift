@@ -199,7 +199,7 @@ struct RxStreamCard: View {
 
                 ParamCapsule(text: "\(strm.sampleRate / 1000)kHz")
                 ParamCapsule(text: "\(strm.channels)CH")
-                ParamCapsule(text: "16-bit")
+                ParamCapsule(text: "\(strm.bitDepth)bit")
             }
 
             Divider().background(Color.white.opacity(0.06))
@@ -271,7 +271,7 @@ struct TxStreamCard: View {
 
                 ParamCapsule(text: "\(tx.sampleRate / 1000)kHz")
                 ParamCapsule(text: "\(tx.channels)CH")
-                ParamCapsule(text: "\(tx.bitDepth)b")
+                ParamCapsule(text: "\(tx.bitDepth)bit")
 
                 // 启停按钮
                 Button(action: { model.toggleTxStream(id: tx.id) }) {

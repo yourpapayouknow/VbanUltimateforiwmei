@@ -12,6 +12,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) uint16_t srcPort;
 @property (nonatomic, assign) uint32_t sampleRate;
 @property (nonatomic, assign) uint32_t channels;
+@property (nonatomic, assign) uint32_t bitDepth;
 @property (nonatomic, copy) NSString *format;
 @property (nonatomic, copy) NSString *status;
 @property (nonatomic, assign) uint64_t packetCount;

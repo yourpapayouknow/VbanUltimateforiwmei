@@ -296,7 +296,22 @@
         sm.srcPort         = s.srcprt;
         sm.sampleRate      = s.sr;
         sm.channels        = s.ch;
-        sm.format          = @"PCM 16-bit";
+        uint32_t bdepth = 16;
+        switch (s.fmt) {
+            case vban::SmplFmt::Int8:    bdepth = 8; break;
+            case vban::SmplFmt::Int16:   bdepth = 16; break;
+            case vban::SmplFmt::Int24:   bdepth = 24; break;
+            case vban::SmplFmt::Int32:   bdepth = 32; break;
+            case vban::SmplFmt::Float32: bdepth = 32; break;
+            case vban::SmplFmt::Float64: bdepth = 64; break;
+            case vban::SmplFmt::Int12:   bdepth = 12; break;
+            case vban::SmplFmt::Int10:   bdepth = 10; break;
+            default:                     bdepth = 16; break;
+        }
+        sm.bitDepth        = bdepth;
+        sm.format          = (s.fmt == vban::SmplFmt::Float32 || s.fmt == vban::SmplFmt::Float64)
+                             ? [NSString stringWithFormat:@"Float %ubit", bdepth]
+                             : [NSString stringWithFormat:@"PCM %ubit", bdepth];
         sm.status          = (s.stt == vban::StrmStt::Active) ? @"Active" : @"Offline";
         sm.packetCount     = s.pktcnt;
         sm.frameCount      = s.frmcnt;
