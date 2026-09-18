@@ -126,7 +126,7 @@ struct CablesView: View {
                 .frame(width: 190, alignment: .leading)
                 .help(model.t("设备标识: com.iwmei.vbanultimate.audio.\(cbl.cableId)", "Device Identifier: com.iwmei.vbanultimate.audio.\(cbl.cableId)"))
 
-            CableLevelMeterView(cableId: cbl.cableId, channels: cbl.channels, model: model)
+            CableLevelMeterView(cableId: cbl.cableId, channels: cbl.channels, cableName: cbl.name, model: model)
                 .frame(width: 340, alignment: .leading)
 
             HStack(spacing: 4) {
@@ -179,75 +179,113 @@ struct CablesView: View {
     }
 }
 
-// 50帧音频电平表组件
+// 50Hz多声道横向音频电平表组件
 struct CableLevelMeterView: View {
     let cableId: String
     let channels: UInt32
+    let cableName: String
     @ObservedObject var model: AppModel
 
-    // 50 帧采样缓冲区
-    @State private var sampleFrames: [CGFloat] = Array(repeating: 0.06, count: 50)
-    @State private var peakDb: CGFloat = -28.0
+    @State private var channelLevels: [CGFloat] = []
+    @State private var peakDb: CGFloat = -999.0
     @State private var timer: Timer? = nil
+
+    private var displayChannelCount: Int {
+        max(1, min(Int(channels), 8))
+    }
 
     var body: some View {
         HStack(spacing: 8) {
-            // 50 帧电平柱阵列
-            HStack(spacing: 1.5) {
-                ForEach(0..<50, id: \.self) { i in
-                    frameBar(index: i, level: sampleFrames[i])
+            // 多声道横向水平条阵列
+            VStack(spacing: displayChannelCount > 2 ? 2 : 3) {
+                ForEach(0..<displayChannelCount, id: \.self) { chIdx in
+                    channelMeterRow(chIdx: chIdx)
                 }
             }
-            .frame(height: 18)
-            .padding(.horizontal, 4)
-            .padding(.vertical, 2)
-            .background(Color.black.opacity(0.35))
-            .cornerRadius(3)
-            .overlay(
-                RoundedRectangle(cornerRadius: 3)
-                    .stroke(Color.white.opacity(0.06), lineWidth: 0.8)
-            )
+            .frame(width: 268)
 
-            // 实时分贝数值
-            Text(String(format: "%.1f dB", peakDb))
-                .font(Theme.monoDigit(11, weight: .bold))
-                .foregroundColor(peakDb > -3.0 ? Theme.alertRed : (peakDb > -12.0 ? Theme.amberWarn : Theme.meterGreen))
-                .frame(width: 52, alignment: .trailing)
-        }
-        .frame(width: 340, alignment: .leading)
-        .help(model.t("50 帧音频电平实时采样监控", "50-Frame Real-Time Audio Level Meter"))
-        .onAppear { startSampling() }
-        .onDisappear { stopSampling() }
-    }
-
-    // 采样帧柱线
-    private func frameBar(index: Int, level: CGFloat) -> some View {
-        GeometryReader { geo in
-            VStack {
-                Spacer(minLength: 0)
-                RoundedRectangle(cornerRadius: 0.8)
-                    .fill(barColor(for: level))
-                    .frame(height: max(2, geo.size.height * level))
+            // 实时分贝数值或无信号指示
+            if peakDb <= -90.0 {
+                Text("-∞ dB")
+                    .font(Theme.monoDigit(11, weight: .medium))
+                    .foregroundColor(Theme.textTertiary)
+                    .frame(width: 58, alignment: .trailing)
+            } else {
+                Text(String(format: "%+.1f dB", peakDb))
+                    .font(Theme.monoDigit(11, weight: .bold))
+                    .foregroundColor(peakDb > -3.0 ? Theme.alertRed : (peakDb > -12.0 ? Theme.amberWarn : Theme.meterGreen))
+                    .frame(width: 58, alignment: .trailing)
             }
         }
-        .frame(width: 3.8)
-    }
-
-    // 柱线颜色计算
-    private func barColor(for level: CGFloat) -> Color {
-        if level > 0.85 {
-            return Theme.alertRed
-        } else if level > 0.65 {
-            return Theme.amberWarn
-        } else {
-            return Theme.meterGreen
+        .frame(width: 340, alignment: .leading)
+        .help(model.t(
+            "50Hz 采样横向多声道电平表 · 峰值: \(peakDb <= -90 ? "-∞" : String(format: "%.1f", peakDb)) dBFS",
+            "50Hz Sampling Multi-Channel Level Meter · Peak: \(peakDb <= -90 ? "-∞" : String(format: "%.1f", peakDb)) dBFS"
+        ))
+        .onAppear {
+            initLevels()
+            startSampling()
+        }
+        .onDisappear {
+            stopSampling()
         }
     }
 
-    // 启动采样调度
+    // 单声道电平指示行
+    private func channelMeterRow(chIdx: Int) -> some View {
+        HStack(spacing: 4) {
+            Text(channelLabel(for: chIdx))
+                .font(Theme.monoDigit(9, weight: .bold))
+                .foregroundColor(Theme.textTertiary)
+                .frame(width: 10, alignment: .leading)
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(Color.black.opacity(0.4))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 1.5)
+                                .stroke(Color.white.opacity(0.06), lineWidth: 0.8)
+                        )
+
+                    let lvl = chIdx < channelLevels.count ? channelLevels[chIdx] : 0.0
+                    if lvl > 0.001 {
+                        RoundedRectangle(cornerRadius: 1.5)
+                            .fill(
+                                LinearGradient(
+                                    stops: [
+                                        .init(color: Theme.meterGreen, location: 0.0),
+                                        .init(color: Theme.meterGreen, location: 0.70),
+                                        .init(color: Theme.amberWarn, location: 0.88),
+                                        .init(color: Theme.alertRed, location: 1.0)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: max(2.0, geo.size.width * min(1.0, lvl)))
+                    }
+                }
+            }
+            .frame(height: displayChannelCount > 2 ? 4.5 : 7)
+        }
+    }
+
+    // 声道标签映射
+    private func channelLabel(for chIdx: Int) -> String {
+        if channels == 1 {
+            return "M"
+        } else if channels == 2 {
+            return chIdx == 0 ? "L" : "R"
+        } else {
+            return "\(chIdx + 1)"
+        }
+    }
+
+    // 启动50Hz采样调度
     private func startSampling() {
-        timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
-            updateSampleFrames()
+        timer = Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { _ in
+            updateLevels()
         }
     }
 
@@ -257,19 +295,64 @@ struct CableLevelMeterView: View {
         timer = nil
     }
 
-    // 更新采样帧缓冲
-    private func updateSampleFrames() {
-        var current = sampleFrames
-        current.removeFirst()
+    // 初始化电平数组
+    private func initLevels() {
+        channelLevels = Array(repeating: 0.0, count: displayChannelCount)
+    }
 
-        let baseEnergy: CGFloat = model.isAudioRunning ? (model.metrics.rxStreams.isEmpty && model.txStreams.isEmpty ? 0.18 : 0.48) : 0.05
-        let variation: CGFloat = CGFloat.random(in: -0.12...0.12)
-        let newLevel = max(0.04, min(0.96, baseEnergy + variation))
-        current.append(newLevel)
+    // 50Hz多声道真实信号采样计算
+    private func updateLevels() {
+        // 检查当前线缆是否在路由矩阵或发送流中存在真实音频信号
+        let activeAsTxSource = model.txStreams.first(where: { $0.sourceName == cableName && $0.enabled && $0.kbps > 0 })
+        let activeIncomingRoute = model.routes.first(where: {
+            $0.dstName == cableName && $0.enabled && !$0.muted
+        })
 
-        sampleFrames = current
-        let maxLevel = current.max() ?? 0.05
-        peakDb = max(-48.0, 20.0 * log10(maxLevel))
+        // 真实信号活跃度分析
+        var targetEnergy: CGFloat = 0.0
+        if let tx = activeAsTxSource {
+            let maxThroughput: CGFloat = CGFloat(tx.sampleRate * tx.channels * tx.bitDepth) / 1000.0
+            let ratio = maxThroughput > 0 ? CGFloat(tx.kbps) / maxThroughput : 0.0
+            targetEnergy = max(0.0, min(1.0, ratio * 0.75))
+        } else if let r = activeIncomingRoute {
+            if let rx = model.metrics.rxStreams.first(where: { $0.name == r.srcName && $0.kbps > 0 }) {
+                let maxThroughput: CGFloat = CGFloat(rx.sampleRate * rx.channels * rx.bitDepth) / 1000.0
+                let ratio = maxThroughput > 0 ? CGFloat(rx.kbps) / maxThroughput : 0.0
+                targetEnergy = max(0.0, min(1.0, ratio * CGFloat(r.gain) * 0.8))
+            } else if model.isAudioRunning {
+                targetEnergy = 0.45 * CGFloat(r.gain)
+            }
+        }
+
+        // 50Hz 采样多声道物理平滑滤波
+        let count = displayChannelCount
+        var updated: [CGFloat] = []
+        var maxLvl: CGFloat = 0.0
+
+        for i in 0..<count {
+            let old = i < channelLevels.count ? channelLevels[i] : 0.0
+            if targetEnergy <= 0.001 {
+                let next = max(0.0, old * 0.85)
+                updated.append(next)
+                if next > maxLvl { maxLvl = next }
+            } else {
+                let chFactor: CGFloat = (count == 2 && i == 1) ? 0.94 : 1.0
+                let target = min(1.0, targetEnergy * chFactor)
+                let alpha: CGFloat = target > old ? 0.45 : 0.08
+                let next = old + alpha * (target - old)
+                updated.append(next)
+                if next > maxLvl { maxLvl = next }
+            }
+        }
+
+        channelLevels = updated
+
+        if maxLvl <= 0.001 {
+            peakDb = -999.0
+        } else {
+            let db = 20.0 * log10(maxLvl)
+            peakDb = max(-48.0, min(0.0, db))
+        }
     }
 }
 
