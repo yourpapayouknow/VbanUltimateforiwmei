@@ -1,6 +1,6 @@
 import SwiftUI
 
-// 设置管理视图
+// 设置管理双列视图
 struct SettingsView: View {
     @ObservedObject var model: AppModel
 
@@ -10,124 +10,84 @@ struct SettingsView: View {
 
             Divider().background(Theme.borderSubtle)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    systemStatusSection
+            HStack(spacing: 0) {
+                generalSettingsColumn
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    Divider().background(Theme.borderSubtle)
+                Divider().background(Theme.borderSubtle)
 
-                    interfaceAndNetworkSection
-
-                    Divider().background(Theme.borderSubtle)
-
-                    virtualDriverSection
-
-                    Divider().background(Theme.borderSubtle)
-
-                    aboutSection
-                }
-                .padding(20)
+                aboutHeroColumn
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .background(Theme.windowBg)
     }
 
-    // 顶部操作工具栏
+    // 顶部双列操作工具栏
     private var topToolbar: some View {
-        HStack(spacing: 8) {
-            Text(model.t("设置", "Settings"))
-                .font(Theme.cnText(14, weight: .bold))
-                .foregroundColor(Theme.textPrimary)
-                .help(model.t("系统运行状态遥测与全局通信配置", "System telemetry and global communication settings"))
+        HStack(spacing: 0) {
+            // 左列标题：常规设置
+            HStack(spacing: 8) {
+                Text(model.t("常规设置", "General Settings"))
+                    .font(Theme.cnText(16.5, weight: .bold))
+                    .foregroundColor(Theme.textPrimary)
+                    .help(model.t("音频工作台界面语言、网络端口与核心驱动配置", "Configure workstation language, network port, and CoreAudio driver"))
 
-            Spacer()
+                Spacer()
 
-            Button(action: {
-                model.refreshAll()
-            }) {
-                Text(model.t("刷新状态", "Refresh"))
-                    .font(Theme.cnText(12, weight: .semibold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Theme.neonCyan.opacity(0.18))
-                    .foregroundColor(Theme.neonCyan)
-                    .cornerRadius(4)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 4)
-                            .stroke(Theme.neonCyan.opacity(0.4), lineWidth: 1)
-                    )
+                Button(action: {
+                    model.refreshAll()
+                }) {
+                    Text(model.t("刷新状态", "Refresh"))
+                        .font(Theme.cnText(12, weight: .semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Theme.neonCyan.opacity(0.18))
+                        .foregroundColor(Theme.neonCyan)
+                        .cornerRadius(4)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(Theme.neonCyan.opacity(0.4), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .help(model.t("强制重新扫描 CoreAudio 硬件与网络流状态", "Force rescan CoreAudio devices and stream states"))
             }
-            .buttonStyle(.plain)
-            .help(model.t("强制重新扫描 CoreAudio 硬件与网络流状态", "Force rescan CoreAudio devices and stream states"))
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // 右列标题：关于
+            HStack(spacing: 8) {
+                Text(model.t("关于", "About"))
+                    .font(Theme.cnText(16.5, weight: .bold))
+                    .foregroundColor(Theme.textPrimary)
+                    .help(model.t("应用程序版本信息、底层架构规格与技术支持", "Application version, architecture specs, and technical support"))
+
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(.horizontal, 16)
         .frame(height: 40)
         .background(Color.white.opacity(0.03))
     }
 
-    // 系统状态全宽指标栏
-    private var systemStatusSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(model.t("系统运行状态", "System Status"))
-                .font(Theme.cnText(12.5, weight: .bold))
-                .foregroundColor(Theme.neonCyan)
+    // 常规设置列
+    private var generalSettingsColumn: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                interfaceAndNetworkSection
 
-            HStack(spacing: 12) {
-                metricCell(
-                    title: model.t("接收活跃流", "Active Rx"),
-                    value: "\(model.metrics.activeRx)",
-                    color: Theme.meterGreen,
-                    helpText: model.t("当前在线接收的网络音频流数量", "Number of active incoming streams")
-                )
-                metricCell(
-                    title: model.t("发送活跃流", "Active Tx"),
-                    value: "\(model.metrics.activeTx)",
-                    color: Theme.amberWarn,
-                    helpText: model.t("当前向外发送的网络音频流数量", "Number of active outgoing streams")
-                )
-                metricCell(
-                    title: model.t("虚拟音频线缆", "Virtual Cables"),
-                    value: "\(model.cables.count)",
-                    color: Theme.neonCyan,
-                    helpText: model.t("系统 CoreAudio HAL 中已注册的虚拟线缆数量", "Registered virtual cables in CoreAudio HAL")
-                )
-                metricCell(
-                    title: model.t("累计丢包数", "Packet Loss"),
-                    value: "\(model.metrics.totalLost)",
-                    color: model.metrics.totalLost > 0 ? Theme.alertRed : Theme.meterGreen,
-                    helpText: model.t("自应用启动以来的所有流 UDP 丢包总数", "Total UDP packet loss count across all streams")
-                )
-                metricCell(
-                    title: model.t("音频调度核心", "Audio Engine"),
-                    value: model.isAudioRunning ? model.t("已就绪", "Ready") : model.t("已暂停", "Paused"),
-                    color: model.isAudioRunning ? Theme.meterGreen : Theme.alertRed,
-                    helpText: model.t("底层 CoreAudio AUHAL 实时音频引擎调度状态", "CoreAudio AUHAL real-time audio engine state")
-                )
+                Divider().background(Theme.borderSubtle)
+
+                virtualDriverSection
+
+                Divider().background(Theme.borderSubtle)
+
+                telemetrySection
             }
+            .padding(18)
         }
-    }
-
-    // 状态指标单元格
-    private func metricCell(title: String, value: String, color: Color, helpText: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(Theme.cnText(11.5, weight: .semibold))
-                .foregroundColor(Theme.textTertiary)
-
-            Text(value)
-                .font(Theme.monoDigit(18, weight: .bold))
-                .foregroundColor(color)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.02))
-        .cornerRadius(6)
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(Theme.borderSubtle, lineWidth: 1)
-        )
-        .help(helpText)
     }
 
     // 界面与通信配置
@@ -150,7 +110,7 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 200)
+                .frame(width: 180)
                 .help(model.t("切换应用程序界面显示语言", "Switch application display language"))
             }
 
@@ -215,17 +175,219 @@ struct SettingsView: View {
         }
     }
 
-    // 关于信息
-    private var aboutSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(model.t("关于", "About"))
+    // 系统运行遥测状态
+    private var telemetrySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(model.t("系统运行状态", "System Status"))
                 .font(Theme.cnText(12.5, weight: .bold))
+                .foregroundColor(Theme.neonCyan)
+
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    telemetryCard(
+                        title: model.t("接收活跃流", "Active Rx"),
+                        value: "\(model.metrics.activeRx)",
+                        color: Theme.meterGreen,
+                        helpText: model.t("当前在线接收的网络音频流数量", "Number of active incoming streams")
+                    )
+                    telemetryCard(
+                        title: model.t("发送活跃流", "Active Tx"),
+                        value: "\(model.metrics.activeTx)",
+                        color: Theme.amberWarn,
+                        helpText: model.t("当前向外发送的网络音频流数量", "Number of active outgoing streams")
+                    )
+                }
+
+                HStack(spacing: 8) {
+                    telemetryCard(
+                        title: model.t("虚拟音频线缆", "Virtual Cables"),
+                        value: "\(model.cables.count)",
+                        color: Theme.neonCyan,
+                        helpText: model.t("系统 CoreAudio HAL 中已注册的虚拟线缆数量", "Registered virtual cables in CoreAudio HAL")
+                    )
+                    telemetryCard(
+                        title: model.t("累计丢包数", "Packet Loss"),
+                        value: "\(model.metrics.totalLost)",
+                        color: model.metrics.totalLost > 0 ? Theme.alertRed : Theme.meterGreen,
+                        helpText: model.t("自应用启动以来的所有流 UDP 丢包总数", "Total UDP packet loss count across all streams")
+                    )
+                }
+
+                telemetryCard(
+                    title: model.t("音频调度核心", "Audio Engine"),
+                    value: model.isAudioRunning ? model.t("已就绪", "Ready") : model.t("已暂停", "Paused"),
+                    color: model.isAudioRunning ? Theme.meterGreen : Theme.alertRed,
+                    helpText: model.t("底层 CoreAudio AUHAL 实时音频引擎调度状态", "CoreAudio AUHAL real-time audio engine state")
+                )
+            }
+        }
+    }
+
+    // 遥测指标小单元格
+    private func telemetryCard(title: String, value: String, color: Color, helpText: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(Theme.cnText(11.5, weight: .semibold))
                 .foregroundColor(Theme.textTertiary)
 
-            Text("VBAN Ultimate for macOS • Apple Silicon (arm64)")
-                .font(Theme.cnText(13, weight: .semibold))
-                .foregroundColor(Theme.textPrimary)
-                .help(model.t("底层采用 C++20 实时安全（RT-Safe）无锁 SPSC 环形缓冲、单 Socket 多流高效解复用与自适应 Jitter 缓冲架构。", "Built with C++20 RT-safe lock-free SPSC circular buffers, single-socket multi-stream demuxing, and adaptive jitter buffer architecture."))
+            Text(value)
+                .font(Theme.monoDigit(16, weight: .bold))
+                .foregroundColor(color)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.02))
+        .cornerRadius(6)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Theme.borderSubtle, lineWidth: 1)
+        )
+        .help(helpText)
+    }
+
+    // 关于信息高级展示列
+    private var aboutHeroColumn: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                identityView
+
+                sloganView
+
+                Divider().background(Theme.borderSubtle)
+
+                specsSection
+
+                Divider().background(Theme.borderSubtle)
+
+                copyrightAndLinksSection
+            }
+            .padding(20)
+        }
+    }
+
+    // 应用标识与版本
+    private var identityView: some View {
+        HStack(spacing: 16) {
+            if let icon = loadBundleImage(named: "AppIcon") {
+                Image(nsImage: icon)
+                    .resizable()
+                    .frame(width: 64, height: 64)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Theme.neonCyan.opacity(0.45), lineWidth: 1.2)
+                    )
+                    .shadow(color: Theme.neonCyan.opacity(0.22), radius: 8, x: 0, y: 2)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("VBAN Ultimate")
+                    .font(Theme.cnText(19, weight: .bold))
+                    .foregroundColor(Theme.textPrimary)
+
+                HStack(spacing: 6) {
+                    ParamCapsule(text: "v1.0.0", color: Theme.neonCyan)
+                    ParamCapsule(text: "arm64", color: Theme.textSecondary)
+                    ParamCapsule(text: "macOS 13+", color: Theme.textTertiary)
+                }
+            }
+        }
+    }
+
+    // 产品一句话定位
+    private var sloganView: some View {
+        Text(model.t(
+            "广播级 VBAN 局域网音频传输与 CoreAudio 虚拟线缆管理工作台",
+            "Broadcast VBAN network audio stream management & CoreAudio virtual cable workstation."
+        ))
+        .font(Theme.cnText(12, weight: .medium))
+        .foregroundColor(Theme.textSecondary)
+        .lineSpacing(3)
+    }
+
+    // 技术规格清单
+    private var specsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(model.t("技术规格与架构", "Technical Specifications"))
+                .font(Theme.cnText(12, weight: .bold))
+                .foregroundColor(Theme.neonCyan)
+
+            VStack(spacing: 6) {
+                specRow(label: model.t("传输协议", "Protocol"), value: "VBAN Raw UDP (28B)")
+                specRow(label: model.t("实时内核", "RT Engine"), value: "C++20 SPSC Lock-free")
+                specRow(label: model.t("虚拟驱动", "Audio HAL"), value: "AudioServerPlugIn")
+                specRow(label: model.t("调度精度", "Clocking"), value: "AUHAL Adaptive Sync")
+            }
+        }
+    }
+
+    // 技术规格行
+    private func specRow(label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(Theme.cnText(11.5, weight: .medium))
+                .foregroundColor(Theme.textTertiary)
+
+            Spacer()
+
+            Text(value)
+                .font(Theme.monoDigit(11.5, weight: .semibold))
+                .foregroundColor(Theme.textPrimary)
+        }
+    }
+
+    // 版权与外链支持
+    private var copyrightAndLinksSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("© 2026 iwmei. All rights reserved.")
+                .font(Theme.cnText(11.5, weight: .medium))
+                .foregroundColor(Theme.textTertiary)
+
+            Text(model.t(
+                "遵循 VBAN 协议开源准则与 Apple CoreAudio HAL 驱动规范",
+                "Compliant with VBAN protocol specifications and Apple CoreAudio HAL standards."
+            ))
+            .font(Theme.cnText(10.5, weight: .regular))
+            .foregroundColor(Theme.textTertiary.opacity(0.85))
+
+            HStack(spacing: 8) {
+                linkButton(title: model.t("技术文档", "Docs"), urlString: "https://github.com/iwmei/vbanultimate#readme")
+                linkButton(title: model.t("开源仓库", "GitHub"), urlString: "https://github.com/iwmei/vbanultimate")
+                linkButton(title: model.t("反馈支持", "Feedback"), urlString: "https://github.com/iwmei/vbanultimate/issues")
+            }
+            .padding(.top, 4)
+        }
+    }
+
+    // 外部链接按钮
+    private func linkButton(title: String, urlString: String) -> some View {
+        Button(action: {
+            if let url = URL(string: urlString) {
+                NSWorkspace.shared.open(url)
+            }
+        }) {
+            Text(title)
+                .font(Theme.cnText(11, weight: .semibold))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3.5)
+                .background(Color.white.opacity(0.04))
+                .foregroundColor(Theme.neonCyan)
+                .cornerRadius(4)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(Theme.neonCyan.opacity(0.35), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // 本地图片资源加载
+    private func loadBundleImage(named: String) -> NSImage? {
+        if let url = Bundle.main.url(forResource: named, withExtension: "png"),
+           let img = NSImage(contentsOf: url) {
+            return img
+        }
+        return NSImage(contentsOfFile: "Resources/\(named).png")
     }
 }

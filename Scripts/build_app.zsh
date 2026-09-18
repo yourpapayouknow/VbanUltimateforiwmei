@@ -17,7 +17,12 @@ clang++ -std=c++20 -x objective-c++ -c "$PROJECT_DIR/Bridge/BridgeCore.mm" \
     -target arm64-apple-macos13.0 \
     -o "$PROJECT_DIR/bin/BridgeCore.o" -Wall -Wextra -fobjc-arc
 
-# 2. 生成 App Info.plist
+# 2. 生成 App Info.plist 并同步 Resources
+mkdir -p "$APP_DIR/Contents/Resources"
+if [ -d "$PROJECT_DIR/Resources" ]; then
+    cp -R "$PROJECT_DIR/Resources/"* "$APP_DIR/Contents/Resources/"
+fi
+
 cat << 'EOF' > "$APP_DIR/Contents/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -25,6 +30,8 @@ cat << 'EOF' > "$APP_DIR/Contents/Info.plist"
 <dict>
     <key>CFBundleExecutable</key>
     <string>VBANUltimate</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.iwmei.vbanultimate</string>
     <key>CFBundleName</key>
