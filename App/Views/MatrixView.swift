@@ -944,9 +944,6 @@ struct AddRouteSheet: View {
 
     private var sheetHeader: some View {
         HStack {
-            Image(systemName: "arrow.triangle.branch")
-                .font(.system(size: 16))
-                .foregroundColor(Theme.neonCyan)
             Text(model.t("新建音频路由", "New Audio Route"))
                 .font(Theme.cnText(14, weight: .bold))
                 .foregroundColor(Theme.textPrimary)

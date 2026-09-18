@@ -521,9 +521,6 @@ struct AddTxStreamSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 16))
-                    .foregroundColor(Theme.amberWarn)
                 Text(model.t("新建 VBAN 音频发送流", "New VBAN Outgoing Stream"))
                     .font(Theme.cnText(14, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
