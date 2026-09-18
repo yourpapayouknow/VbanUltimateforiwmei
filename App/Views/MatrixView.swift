@@ -325,9 +325,9 @@ struct MatrixCanvasView: View {
     @Binding var outputSlots: [MatrixSlot]
     var onOpenAddSheet: () -> Void
 
-    let cellSize: CGFloat = 72
-    let inLabelWidth: CGFloat = 144
-    let dashedThickness: CGFloat = 46
+    let cellSize: CGFloat = 100
+    let inLabelWidth: CGFloat = 210
+    let dashedThickness: CGFloat = 44
 
     var body: some View {
         ScrollView([.horizontal, .vertical], showsIndicators: true) {
@@ -346,45 +346,11 @@ struct MatrixCanvasView: View {
     // 矩阵网格布局
     private var matrixGridWrapper: some View {
         Grid(horizontalSpacing: 4, verticalSpacing: 4) {
-            // 顶部外围虚线槽位
-            GridRow {
-                Color.clear
-                    .gridCellColumns(1)
-                    .frame(width: dashedThickness, height: dashedThickness)
-
-                Color.clear
-                    .gridCellColumns(1)
-                    .frame(width: inLabelWidth, height: dashedThickness)
-
-                ForEach(0..<outputSlots.count, id: \.self) { cIdx in
-                    MatrixDashedPlusCell(
-                        width: cellSize,
-                        height: dashedThickness,
-                        label: "+",
-                        tooltip: model.t("在第 \(cIdx + 1) 列插入输出通道", "Insert Output Channel at column \(cIdx + 1)")
-                    ) {
-                        insertOutputSlot(at: cIdx)
-                    }
-                }
-
-                Color.clear
-                    .gridCellColumns(1)
-                    .frame(width: dashedThickness, height: dashedThickness)
-            }
-
             // 输出列标头
             GridRow {
-                MatrixDashedPlusCell(
-                    width: dashedThickness,
-                    height: cellSize,
-                    label: "+",
-                    tooltip: model.t("新建音频路由", "Add Route")
-                ) {
-                    onOpenAddSheet()
-                }
-
-                // 坐标指示单元
-                cornerIndicator
+                // 左上角透明占位单元
+                Color.clear
+                    .frame(width: inLabelWidth, height: cellSize)
 
                 ForEach(Array(outputSlots.enumerated()), id: \.element.id) { colIdx, outSlot in
                     OutputEndpointHeader(
@@ -397,6 +363,9 @@ struct MatrixCanvasView: View {
                             outputSlots[colIdx].endpointId = newId
                             outputSlots[colIdx].name = newName
                             outputSlots[colIdx].typeDesc = newType
+                        },
+                        onDelete: {
+                            deleteOutputSlot(at: colIdx)
                         }
                     )
                 }
@@ -414,15 +383,6 @@ struct MatrixCanvasView: View {
             // 输入行与交叉连接单元
             ForEach(Array(inputSlots.enumerated()), id: \.element.id) { rowIdx, inSlot in
                 GridRow {
-                    MatrixDashedPlusCell(
-                        width: dashedThickness,
-                        height: cellSize,
-                        label: "+",
-                        tooltip: model.t("在第 \(rowIdx + 1) 行插入输入通道", "Insert Input Channel at row \(rowIdx + 1)")
-                    ) {
-                        insertInputSlot(at: rowIdx)
-                    }
-
                     InputEndpointHeader(
                         slot: inSlot,
                         rowIndex: rowIdx,
@@ -433,6 +393,9 @@ struct MatrixCanvasView: View {
                             inputSlots[rowIdx].endpointId = newId
                             inputSlots[rowIdx].name = newName
                             inputSlots[rowIdx].typeDesc = newType
+                        },
+                        onDelete: {
+                            deleteInputSlot(at: rowIdx)
                         }
                     )
 
@@ -460,19 +423,10 @@ struct MatrixCanvasView: View {
             // 底部外围虚线槽位
             GridRow {
                 MatrixDashedPlusCell(
-                    width: dashedThickness,
-                    height: dashedThickness,
-                    label: "+",
-                    tooltip: model.t("添加输入通道", "Add Input")
-                ) {
-                    appendInputSlot()
-                }
-
-                MatrixDashedPlusCell(
                     width: inLabelWidth,
                     height: dashedThickness,
                     label: "+",
-                    tooltip: model.t("在左侧添加输入通道", "Add input channel")
+                    tooltip: model.t("添加输入通道", "Add input channel")
                 ) {
                     appendInputSlot()
                 }
@@ -498,47 +452,9 @@ struct MatrixCanvasView: View {
                 }
             }
         }
-        .padding(24)
-        .background(Color(red: 0.09, green: 0.09, blue: 0.11).opacity(0.92))
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
     }
 
-    // 坐标指示单元
-    private var cornerIndicator: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.white.opacity(0.03))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                )
-
-            VStack(alignment: .leading, spacing: 3) {
-                HStack {
-                    Spacer()
-                    Text("OUT (DEST) ↗")
-                        .font(Theme.monoDigit(9.5, weight: .bold))
-                        .foregroundColor(Theme.amberWarn)
-                }
-                Divider().background(Color.white.opacity(0.12))
-                HStack {
-                    Text("↙ IN (SRC)")
-                        .font(Theme.monoDigit(9.5, weight: .bold))
-                        .foregroundColor(Theme.neonCyan)
-                    Spacer()
-                }
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 6)
-        }
-        .frame(width: inLabelWidth, height: cellSize)
-        .help(model.t("左侧行：输入信号源 (Sources / Inputs) → 顶部列：输出目标端口 (Destinations / Outputs)", "Left: Sources / Inputs → Top: Destinations / Outputs"))
-    }
-
+    // 追加输入槽位
     private func appendInputSlot() {
         let idx = inputSlots.count + 1
         inputSlots.append(MatrixSlot(
@@ -550,6 +466,7 @@ struct MatrixCanvasView: View {
         ))
     }
 
+    // 插入输入槽位
     private func insertInputSlot(at index: Int) {
         let idx = inputSlots.count + 1
         inputSlots.insert(MatrixSlot(
@@ -561,6 +478,20 @@ struct MatrixCanvasView: View {
         ), at: index)
     }
 
+    // 删除输入槽位
+    private func deleteInputSlot(at index: Int) {
+        guard index < inputSlots.count else { return }
+        let slot = inputSlots[index]
+        if !slot.endpointId.isEmpty {
+            let routesToRemove = model.routes.filter { $0.srcId == slot.endpointId }
+            for r in routesToRemove {
+                model.removeRoute(id: r.routeId)
+            }
+        }
+        inputSlots.remove(at: index)
+    }
+
+    // 追加输出槽位
     private func appendOutputSlot() {
         let idx = outputSlots.count + 1
         outputSlots.append(MatrixSlot(
@@ -572,6 +503,7 @@ struct MatrixCanvasView: View {
         ))
     }
 
+    // 插入输出槽位
     private func insertOutputSlot(at index: Int) {
         let idx = outputSlots.count + 1
         outputSlots.insert(MatrixSlot(
@@ -581,6 +513,41 @@ struct MatrixCanvasView: View {
             typeDesc: model.t("未配置", "Unassigned"),
             iconName: "speaker.wave.2"
         ), at: index)
+    }
+
+    // 删除输出槽位
+    private func deleteOutputSlot(at index: Int) {
+        guard index < outputSlots.count else { return }
+        let slot = outputSlots[index]
+        if !slot.endpointId.isEmpty {
+            let routesToRemove = model.routes.filter { $0.dstId == slot.endpointId }
+            for r in routesToRemove {
+                model.removeRoute(id: r.routeId)
+            }
+        }
+        outputSlots.remove(at: index)
+    }
+}
+
+// -------------------------------------------------------------
+// 滚动标签组件
+// -------------------------------------------------------------
+struct RollingLabel: View {
+    let text: String
+    let font: Font
+    let color: Color
+    var alignment: Alignment = .leading
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            Text(text)
+                .font(font)
+                .foregroundColor(color)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 2)
+        }
+        .help(text)
     }
 }
 
@@ -609,7 +576,7 @@ struct MatrixDashedPlusCell: View {
                     .foregroundColor(isHovered ? Theme.neonCyan : Color.white.opacity(0.22))
 
                 Text(label)
-                    .font(Theme.cnText(12.5, weight: .bold))
+                    .font(Theme.cnText(14, weight: .bold))
                     .foregroundColor(isHovered ? Theme.neonCyan : Theme.textTertiary)
             }
             .frame(width: width, height: height)
@@ -632,61 +599,78 @@ struct OutputEndpointHeader: View {
     let width: CGFloat
     let height: CGFloat
     let onSelectEndpoint: (String, String, String) -> Void
+    let onDelete: () -> Void
 
     var body: some View {
-        Menu {
-            Section(model.t("物理输出设备", "Physical Outputs")) {
-                ForEach(model.devices.filter { $0.outChannels > 0 }, id: \.uid) { d in
-                    Button(d.name) {
-                        onSelectEndpoint(d.uid, d.name, model.t("物理输出", "Device Out"))
-                    }
-                }
-            }
-            Section(model.t("虚拟线缆输入端", "Virtual Cable Inputs")) {
-                ForEach(model.cables, id: \.cableId) { c in
-                    Button(c.name) {
-                        onSelectEndpoint(c.cableId, c.name, model.t("线缆输入", "Cable In"))
-                    }
-                }
-            }
-            Section(model.t("网络发送流", "Network Outgoing Streams")) {
-                ForEach(model.txStreams, id: \.name) { tx in
-                    Button(tx.name) {
-                        onSelectEndpoint(tx.name, "VBAN [\(tx.name)]", model.t("网络流", "VBAN TX"))
-                    }
-                }
-            }
-        } label: {
-            VStack(spacing: 3) {
-                HStack(spacing: 3) {
-                    Image(systemName: slot.endpointId.isEmpty ? "exclamationmark.circle" : "speaker.wave.2.fill")
-                        .font(.system(size: 9.5))
-                        .foregroundColor(slot.endpointId.isEmpty ? Theme.amberWarn : Theme.amberWarn)
-                    Text("Out \(colIndex + 1)")
-                        .font(Theme.monoDigit(10.5, weight: .bold))
-                        .foregroundColor(Theme.amberWarn)
-                }
+        VStack(spacing: 4) {
+            Text("Out \(colIndex + 1)")
+                .font(Theme.monoDigit(14, weight: .bold))
+                .foregroundColor(Theme.amberWarn)
 
-                Text(slot.name)
-                    .font(Theme.cnText(10.5, weight: .medium))
-                    .foregroundColor(Theme.textPrimary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-
-                ParamCapsule(text: slot.typeDesc, color: slot.endpointId.isEmpty ? Theme.amberWarn : Theme.textTertiary)
-            }
-            .padding(4)
-            .frame(width: width, height: height)
-            .background(Color.white.opacity(0.025))
-            .cornerRadius(5)
-            .overlay(
-                RoundedRectangle(cornerRadius: 5)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            RollingLabel(
+                text: slot.name,
+                font: Theme.cnText(12, weight: .medium),
+                color: Theme.textPrimary,
+                alignment: .center
             )
+            .frame(height: 18)
+
+            HStack(spacing: 6) {
+                Menu {
+                    Section(model.t("物理输出设备", "Physical Outputs")) {
+                        ForEach(model.devices.filter { $0.outChannels > 0 }, id: \.uid) { d in
+                            Button(d.name) {
+                                onSelectEndpoint(d.uid, d.name, model.t("物理输出", "Device Out"))
+                            }
+                        }
+                    }
+                    Section(model.t("虚拟线缆输入端", "Virtual Cable Inputs")) {
+                        ForEach(model.cables, id: \.cableId) { c in
+                            Button(c.name) {
+                                onSelectEndpoint(c.cableId, c.name, model.t("线缆输入", "Cable In"))
+                            }
+                        }
+                    }
+                    Section(model.t("网络发送流", "Network Outgoing Streams")) {
+                        ForEach(model.txStreams, id: \.name) { tx in
+                            Button(tx.name) {
+                                onSelectEndpoint(tx.name, "VBAN [\(tx.name)]", model.t("网络流", "VBAN TX"))
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(Theme.neonCyan)
+                        .frame(width: 22, height: 22)
+                        .background(Color.white.opacity(0.06))
+                        .cornerRadius(4)
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .frame(width: 22, height: 22)
+                .help(model.t("修改/切换此输出端点", "Change output destination"))
+
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.alertRed.opacity(0.8))
+                        .frame(width: 22, height: 22)
+                        .background(Color.white.opacity(0.06))
+                        .cornerRadius(4)
+                }
+                .buttonStyle(.plain)
+                .help(model.t("删除此输出通道", "Remove this output channel"))
+            }
         }
-        .buttonStyle(.plain)
+        .padding(6)
         .frame(width: width, height: height)
-        .help(model.t("点击更换输出端点：\(slot.name)", "Click to change output: \(slot.name)"))
+        .background(Color.white.opacity(0.025))
+        .cornerRadius(5)
+        .overlay(
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
     }
 }
 
@@ -700,64 +684,81 @@ struct InputEndpointHeader: View {
     let width: CGFloat
     let height: CGFloat
     let onSelectEndpoint: (String, String, String) -> Void
+    let onDelete: () -> Void
 
     var body: some View {
-        Menu {
-            Section(model.t("物理输入设备", "Physical Inputs")) {
-                ForEach(model.devices.filter { $0.inChannels > 0 }, id: \.uid) { d in
-                    Button(d.name) {
-                        onSelectEndpoint(d.uid, d.name, model.t("物理输入", "Device In"))
-                    }
-                }
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("In \(rowIndex + 1)")
+                    .font(Theme.monoDigit(14, weight: .bold))
+                    .foregroundColor(Theme.neonCyan)
+
+                RollingLabel(
+                    text: slot.name,
+                    font: Theme.cnText(12.5, weight: .semibold),
+                    color: Theme.textPrimary,
+                    alignment: .leading
+                )
+                .frame(height: 18)
             }
-            Section(model.t("虚拟线缆输出端", "Virtual Cable Outputs")) {
-                ForEach(model.cables, id: \.cableId) { c in
-                    Button(c.name) {
-                        onSelectEndpoint(c.cableId, c.name, model.t("线缆输出", "Cable Out"))
-                    }
-                }
-            }
-            Section(model.t("网络接收流", "Network Incoming Streams")) {
-                ForEach(model.metrics.rxStreams, id: \.name) { s in
-                    Button(s.name) {
-                        onSelectEndpoint(s.name, "VBAN [\(s.name)]", model.t("网络流", "VBAN RX"))
-                    }
-                }
-            }
-        } label: {
+            .frame(maxWidth: .infinity, alignment: .leading)
+
             HStack(spacing: 6) {
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 3) {
-                        Image(systemName: slot.endpointId.isEmpty ? "exclamationmark.circle" : "waveform")
-                            .font(.system(size: 9.5))
-                            .foregroundColor(slot.endpointId.isEmpty ? Theme.amberWarn : Theme.neonCyan)
-                        Text("In \(rowIndex + 1)")
-                            .font(Theme.monoDigit(10.5, weight: .bold))
-                            .foregroundColor(Theme.neonCyan)
+                Menu {
+                    Section(model.t("物理输入设备", "Physical Inputs")) {
+                        ForEach(model.devices.filter { $0.inChannels > 0 }, id: \.uid) { d in
+                            Button(d.name) {
+                                onSelectEndpoint(d.uid, d.name, model.t("物理输入", "Device In"))
+                            }
+                        }
                     }
-
-                    Text(slot.name)
-                        .font(Theme.cnText(11, weight: .semibold))
-                        .foregroundColor(Theme.textPrimary)
-                        .lineLimit(1)
+                    Section(model.t("虚拟线缆输出端", "Virtual Cable Outputs")) {
+                        ForEach(model.cables, id: \.cableId) { c in
+                            Button(c.name) {
+                                onSelectEndpoint(c.cableId, c.name, model.t("线缆输出", "Cable Out"))
+                            }
+                        }
+                    }
+                    Section(model.t("网络接收流", "Network Incoming Streams")) {
+                        ForEach(model.metrics.rxStreams, id: \.name) { s in
+                            Button(s.name) {
+                                onSelectEndpoint(s.name, "VBAN [\(s.name)]", model.t("网络流", "VBAN RX"))
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(Theme.neonCyan)
+                        .frame(width: 22, height: 22)
+                        .background(Color.white.opacity(0.06))
+                        .cornerRadius(4)
                 }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .frame(width: 22, height: 22)
+                .help(model.t("修改/切换此输入端点", "Change input source"))
 
-                Spacer()
-
-                ParamCapsule(text: slot.typeDesc, color: slot.endpointId.isEmpty ? Theme.amberWarn : Theme.textTertiary)
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.alertRed.opacity(0.8))
+                        .frame(width: 22, height: 22)
+                        .background(Color.white.opacity(0.06))
+                        .cornerRadius(4)
+                }
+                .buttonStyle(.plain)
+                .help(model.t("删除此输入通道", "Remove this input channel"))
             }
-            .padding(.horizontal, 8)
-            .frame(width: width, height: height)
-            .background(Color.white.opacity(0.025))
-            .cornerRadius(5)
-            .overlay(
-                RoundedRectangle(cornerRadius: 5)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
-            )
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 10)
         .frame(width: width, height: height)
-        .help(model.t("点击更换输入端点：\(slot.name)", "Click to change input: \(slot.name)"))
+        .background(Color.white.opacity(0.025))
+        .cornerRadius(5)
+        .overlay(
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
     }
 }
 
@@ -784,13 +785,19 @@ struct CrossPointCell: View {
         Button(action: handleCellClick) {
             ZStack {
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(Color.white.opacity(isHovered ? 0.04 : 0.015))
+                    .fill(route != nil ? Theme.neonCyan.opacity(0.08) : Color.white.opacity(isHovered ? 0.04 : 0.015))
 
                 RoundedRectangle(cornerRadius: 5)
                     .strokeBorder(
                         route != nil ? Theme.neonCyan : Color.white.opacity(isHovered ? 0.18 : 0.08),
                         lineWidth: route != nil ? 2 : 1
                     )
+
+                if route != nil {
+                    Text("ON")
+                        .font(Theme.monoDigit(15, weight: .heavy))
+                        .foregroundColor(Theme.neonCyan)
+                }
             }
             .frame(width: size, height: size)
         }
