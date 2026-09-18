@@ -129,10 +129,10 @@ struct SettingsView: View {
                 .font(Theme.cnText(12.5, weight: .bold))
                 .foregroundColor(Theme.neonCyan)
 
-            // IP Host Address
+            // 主机网络地址行
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("IP Host Address")
+                    Text(model.t("主机网络地址", "IP Host Address"))
                         .font(Theme.cnText(13, weight: .semibold))
                         .foregroundColor(Theme.textPrimary)
                     Text(model.t("本机局域网通信地址", "Local Host LAN Address"))
@@ -163,24 +163,24 @@ struct SettingsView: View {
                             .cornerRadius(3)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 3)
-                                    .stroke(ipCopied ? Theme.meterGreen.opacity(0.5) : Theme.neonCyan.opacity(0.35), lineWidth: 1)
+                                    .stroke(ipCopied ? Theme.meterGreen.opacity(0.85) : Theme.neonCyan.opacity(0.85), lineWidth: 1.2)
                             )
                     }
                     .buttonStyle(.plain)
-                    .help(model.t("复制本机 IP 地址到剪贴板，方便在对端发送设备（如 Voicemeeter / Talkie）中填入", "Copy host IP to clipboard for configuring remote transmitter"))
+                    .help(model.t("复制本机网络地址到剪贴板，方便在对端发送设备中填入", "Copy host IP to clipboard for configuring remote transmitter"))
                 }
             }
-            .help(model.t("本机局域网通信 IP 地址。当远端设备（如 PC 端 Voicemeeter、手机端 Talkie）向本机发送音频流时，须在对端输入此 IP。", "Local host IP address on your LAN. When remote devices (e.g. Voicemeeter, Talkie) send audio to this machine, enter this IP on the transmitter."))
+            .help(model.t("本机局域网通信地址。当远端设备向本机发送音频流时，须在对端输入此地址。点击可复制至剪贴板。", "Local host IP address on your LAN. When remote devices send audio to this machine, enter this IP on the transmitter. Click to copy."))
 
             Divider().background(Color.white.opacity(0.04))
 
-            // VBAN Port
+            // 监听端口行
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("VBAN Port")
+                    Text(model.t("网络监听端口", "VBAN Port"))
                         .font(Theme.cnText(13, weight: .semibold))
                         .foregroundColor(Theme.textPrimary)
-                    Text(model.t("UDP 监听与通信端口", "UDP Listening Port"))
+                    Text(model.t("网络音频数据包监听端口", "UDP Listening Port"))
                         .font(Theme.cnText(10.5, weight: .regular))
                         .foregroundColor(Theme.textTertiary)
                 }
@@ -194,17 +194,17 @@ struct SettingsView: View {
                 .font(Theme.monoDigit(12.5, weight: .semibold))
                 .frame(width: 85)
             }
-            .help(model.t("VBAN 官方标准网络监听端口为 6980。同一局域网或同一机器存在多实例时可自定义端口实现隔离。修改后按回车重新绑定。", "Official standard VBAN UDP port is 6980. Change this to isolate multiple instances on the same host or network. Press Enter to rebind."))
+            .help(model.t("网络监听端口，官方标准为6980。同一网络或同一机器存在多个实例时可自定义端口实现隔离。修改后按回车重新绑定。", "Official standard VBAN UDP port is 6980. Change this to isolate multiple instances on the same host or network. Press Enter to rebind."))
 
             Divider().background(Color.white.opacity(0.04))
 
-            // Username
+            // 用户节点名称行
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Username")
+                    Text(model.t("用户节点标识", "Username"))
                         .font(Theme.cnText(13, weight: .semibold))
                         .foregroundColor(Theme.textPrimary)
-                    Text(model.t("节点呼号与流标识 (≤16字符)", "Station ID & Stream Label (≤16 chars)"))
+                    Text(model.t("电台呼号与发送流标识，不超过十六字符", "Station ID & Stream Label, up to 16 chars"))
                         .font(Theme.cnText(10.5, weight: .regular))
                         .foregroundColor(Theme.textTertiary)
                 }
@@ -216,14 +216,14 @@ struct SettingsView: View {
                     .font(Theme.monoDigit(12.5, weight: .semibold))
                     .frame(width: 140)
             }
-            .help(model.t("节点用户名与电台呼号标识（最大 16 字符）。发送流默认使用此标识，方便对端设备识别通信来源。", "Station username and node identifier (max 16 characters). Transmitted streams use this label by default so remote receivers recognize this node."))
+            .help(model.t("用户节点名称与电台呼号标识，最大长度十六字符。发送流默认使用此标识，方便对端设备识别通信来源。", "Station username and node identifier (max 16 characters). Transmitted streams use this label by default so remote receivers recognize this node."))
 
             Divider().background(Color.white.opacity(0.04))
 
-            // Network Quality
+            // 网络质量策略行
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Network Quality")
+                    Text(model.t("网络传输质量", "Network Quality"))
                         .font(Theme.cnText(13, weight: .semibold))
                         .foregroundColor(Theme.textPrimary)
                     Text(model.networkQuality.desc(for: model.language))
@@ -235,20 +235,20 @@ struct SettingsView: View {
 
                 Picker("", selection: $model.networkQuality) {
                     ForEach(VbanNetworkQuality.allCases) { q in
-                        Text(q.displayName).tag(q)
+                        Text(q.title(for: model.language)).tag(q)
                     }
                 }
                 .pickerStyle(.menu)
                 .frame(width: 110)
             }
-            .help(model.t("网络质量与 Jitter Buffer 抗网络抖动缓冲深度。Optimal(~5ms 局域网超低延迟)、Fast(~10ms 快速推荐)、Medium(~20ms 普通Wi-Fi)、Slow(~40ms 抗抖动)、Very slow(~80ms 极端抗丢包抖动防爆音)。", "Network quality & jitter buffer depth preset. Optimal (~5ms LAN low latency), Fast (~10ms recommended), Medium (~20ms typical Wi-Fi), Slow (~40ms jitter-resistant), Very slow (~80ms maximum underrun protection)."))
+            .help(model.t("网络质量与抗网络抖动平滑缓冲预设。提供极致、快速、中等、慢速、极慢五档策略，动态调整接收端缓冲深度。", "Network quality and jitter buffer depth presets, offering Optimal, Fast, Medium, Slow, and Very slow modes to adaptively adjust reception buffer."))
 
             Divider().background(Color.white.opacity(0.04))
 
-            // Buffering
+            // 音频缓冲大小行
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Buffering")
+                    Text(model.t("音频缓冲大小", "Buffering"))
                         .font(Theme.cnText(13, weight: .semibold))
                         .foregroundColor(Theme.textPrimary)
                     Text(model.bufferingDesc(model.bufferingFrames))
@@ -260,13 +260,13 @@ struct SettingsView: View {
 
                 Picker("", selection: $model.bufferingFrames) {
                     ForEach(model.availableBuffering, id: \.self) { bf in
-                        Text("\(bf)").tag(bf)
+                        Text(model.language == .chinese ? "\(bf) 采样" : "\(bf) samples").tag(bf)
                     }
                 }
                 .pickerStyle(.menu)
                 .frame(width: 110)
             }
-            .help(model.t("音频调度与发包缓冲样本数。441(44.1kHz下10ms标称包)、480(48kHz下10ms标称广播包)、128/256/512/1024(经典低延迟与稳健I/O块大小)。", "Audio scheduling and packet payload sample frames. 441 (nominal 10ms at 44.1kHz), 480 (nominal 10ms at 48kHz broadcast), 128/256/512/1024 (classic low latency & safe I/O buffer sizes)."))
+            .help(model.t("音频调度与网络发包缓冲样本数。包含标称十毫秒封包帧长与经典低延迟音频调度块大小。", "Audio scheduling and packet payload sample frames, covering nominal 10ms packet frames and classic low-latency audio blocks."))
         }
     }
 

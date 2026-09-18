@@ -75,28 +75,28 @@ enum VbanNetworkQuality: UInt8, CaseIterable, Identifiable {
 
     var id: UInt8 { rawValue }
 
-    var displayName: String {
+    func title(for lang: AppLanguage) -> String {
         switch self {
-        case .optimal:  return "Optimal"
-        case .fast:     return "Fast"
-        case .medium:   return "Medium"
-        case .slow:     return "Slow"
-        case .verySlow: return "Very slow"
+        case .optimal:  return lang == .chinese ? "极致" : "Optimal"
+        case .fast:     return lang == .chinese ? "快速" : "Fast"
+        case .medium:   return lang == .chinese ? "中等" : "Medium"
+        case .slow:     return lang == .chinese ? "慢速" : "Slow"
+        case .verySlow: return lang == .chinese ? "极慢" : "Very slow"
         }
     }
 
     func desc(for lang: AppLanguage) -> String {
         switch self {
         case .optimal:
-            return lang == .chinese ? "极低延迟 (~5ms · 适合千兆有线局域网)" : "Ultra-low latency (~5ms · Wired LAN)"
+            return lang == .chinese ? "极低延迟缓冲，适用于高速有线局域网" : "Ultra-low latency buffer for wired LAN"
         case .fast:
-            return lang == .chinese ? "快速响应 (~10ms · 优质网络推荐)" : "Fast response (~10ms · Recommended)"
+            return lang == .chinese ? "快速响应缓冲，推荐标准配置" : "Fast response buffer, recommended"
         case .medium:
-            return lang == .chinese ? "平衡模式 (~20ms · 标准 Wi-Fi 环境)" : "Balanced (~20ms · Typical Wi-Fi)"
+            return lang == .chinese ? "平衡模式缓冲，适用于常规无线网络" : "Balanced buffer for typical wireless network"
         case .slow:
-            return lang == .chinese ? "抗抖动模式 (~40ms · 拥塞网络环境)" : "Jitter resistant (~40ms · Busy network)"
+            return lang == .chinese ? "抗抖动缓冲，适用于繁忙网络环境" : "Jitter resistant buffer for busy network"
         case .verySlow:
-            return lang == .chinese ? "极端抗抖动 (~80ms · 最大安全缓冲)" : "Max protection (~80ms · High jitter)"
+            return lang == .chinese ? "最大安全缓冲，极端抗丢包防爆音" : "Maximum safety buffer against dropouts"
         }
     }
 }
@@ -177,14 +177,26 @@ final class AppModel: ObservableObject {
 
     // 缓冲区样本数业务说明
     func bufferingDesc(_ frames: UInt32) -> String {
-        switch frames {
-        case 128:  return t("128 采样 (~2.67ms @48k · 极低延迟 I/O 块)", "128 samples (~2.67ms @48k · Ultra-low latency)")
-        case 256:  return t("256 采样 (~5.33ms @48k · 低延迟专业音频块)", "256 samples (~5.33ms @48k · Low latency audio)")
-        case 441:  return t("441 采样 (44.1kHz 下 10ms 标称网络包帧长)", "441 samples (10ms nominal packet at 44.1kHz)")
-        case 480:  return t("480 采样 (48.0kHz 下 10ms 广播标准包帧长)", "480 samples (10ms nominal packet at 48kHz)")
-        case 512:  return t("512 采样 (~10.67ms @48k · 标准音频 I/O 块)", "512 samples (~10.67ms @48k · Standard I/O buffer)")
-        case 1024: return t("1024 采样 (~21.33ms @48k · 大缓冲安全防欠载)", "1024 samples (~21.33ms @48k · Large safety buffer)")
-        default:   return "\(frames) samples"
+        if language == .chinese {
+            switch frames {
+            case 128:  return "128 采样，极低硬件调度延迟"
+            case 256:  return "256 采样，专业低延迟音频调度"
+            case 441:  return "441 采样，标称十毫秒网络封包"
+            case 480:  return "480 采样，广播级十毫秒标称封包"
+            case 512:  return "512 采样，标准音频硬件块"
+            case 1024: return "1024 采样，大缓冲防欠载保护"
+            default:   return "\(frames) 采样"
+            }
+        } else {
+            switch frames {
+            case 128:  return "128 samples, ultra-low latency"
+            case 256:  return "256 samples, low latency audio"
+            case 441:  return "441 samples, 10ms nominal packet"
+            case 480:  return "480 samples, broadcast 10ms packet"
+            case 512:  return "512 samples, standard hardware buffer"
+            case 1024: return "1024 samples, large safety buffer"
+            default:   return "\(frames) samples"
+            }
         }
     }
 
