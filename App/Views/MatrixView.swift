@@ -160,6 +160,9 @@ struct MatrixView: View {
         for cable in model.cables {
             availableOutputs.append(MatrixSlot(id: "cable_in_\(cable.cableId)", endpointId: cable.cableId, name: cable.name, typeDesc: model.t("线缆输入", "Cable In"), iconName: "cable.connector"))
         }
+        for tx in model.txStreams {
+            availableOutputs.append(MatrixSlot(id: "tx_\(tx.name)", endpointId: tx.name, name: "VBAN [\(tx.name)]", typeDesc: model.t("网络流", "VBAN TX"), iconName: "waveform"))
+        }
 
         var ins = Array(availableInputs.prefix(4))
         var inIndex = ins.count + 1
@@ -517,23 +520,23 @@ struct MatrixCanvasView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack {
                     Spacer()
-                    Text("OUT ↗")
-                        .font(Theme.monoDigit(10.5, weight: .bold))
+                    Text("OUT (DEST) ↗")
+                        .font(Theme.monoDigit(9.5, weight: .bold))
                         .foregroundColor(Theme.amberWarn)
                 }
                 Divider().background(Color.white.opacity(0.12))
                 HStack {
-                    Text("↙ IN")
-                        .font(Theme.monoDigit(10.5, weight: .bold))
+                    Text("↙ IN (SRC)")
+                        .font(Theme.monoDigit(9.5, weight: .bold))
                         .foregroundColor(Theme.neonCyan)
                     Spacer()
                 }
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 6)
             .padding(.vertical, 6)
         }
         .frame(width: inLabelWidth, height: cellSize)
-        .help(model.t("左侧为输入源 (Inputs)，上侧为输出目标 (Outputs)", "Left: Source Inputs, Top: Destination Outputs"))
+        .help(model.t("左侧行：输入信号源 (Sources / Inputs) → 顶部列：输出目标端口 (Destinations / Outputs)", "Left: Sources / Inputs → Top: Destinations / Outputs"))
     }
 
     private func appendInputSlot() {
@@ -643,6 +646,13 @@ struct OutputEndpointHeader: View {
                 ForEach(model.cables, id: \.cableId) { c in
                     Button(c.name) {
                         onSelectEndpoint(c.cableId, c.name, model.t("线缆输入", "Cable In"))
+                    }
+                }
+            }
+            Section(model.t("网络发送流", "Network Outgoing Streams")) {
+                ForEach(model.txStreams, id: \.name) { tx in
+                    Button(tx.name) {
+                        onSelectEndpoint(tx.name, "VBAN [\(tx.name)]", model.t("网络流", "VBAN TX"))
                     }
                 }
             }
@@ -774,27 +784,13 @@ struct CrossPointCell: View {
         Button(action: handleCellClick) {
             ZStack {
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(backgroundColor)
+                    .fill(Color.white.opacity(isHovered ? 0.04 : 0.015))
 
                 RoundedRectangle(cornerRadius: 5)
-                    .stroke(borderColor, lineWidth: route != nil ? 1.5 : 1)
-
-                if let r = route {
-                    VStack(spacing: 3) {
-                        Image(systemName: r.enabled ? "link.circle.fill" : "link.circle")
-                            .font(.system(size: 17, weight: .bold))
-                            .foregroundColor(r.enabled ? Theme.neonCyan : Theme.amberWarn)
-                            .shadow(color: (r.enabled ? Theme.neonCyan : Color.clear).opacity(0.6), radius: 4)
-
-                        Text(String(format: "%+.0fdB", (r.gain - 1.0) * 12.0))
-                            .font(Theme.monoDigit(10, weight: .bold))
-                            .foregroundColor(r.enabled ? Theme.neonCyan : Theme.textTertiary)
-                    }
-                } else {
-                    Circle()
-                        .fill(isHovered ? Theme.neonCyan.opacity(0.6) : Color.white.opacity(0.12))
-                        .frame(width: isHovered ? 8 : 4, height: isHovered ? 8 : 4)
-                }
+                    .strokeBorder(
+                        route != nil ? Theme.neonCyan : Color.white.opacity(isHovered ? 0.18 : 0.08),
+                        lineWidth: route != nil ? 2 : 1
+                    )
             }
             .frame(width: size, height: size)
         }
@@ -805,28 +801,15 @@ struct CrossPointCell: View {
         .help(tooltipText)
     }
 
-    private var backgroundColor: Color {
-        if let r = route {
-            return r.enabled ? Theme.neonCyan.opacity(0.16) : Theme.amberWarn.opacity(0.12)
-        }
-        return isHovered ? Theme.neonCyan.opacity(0.08) : Color.white.opacity(0.015)
-    }
-
-    private var borderColor: Color {
-        if let r = route {
-            return r.enabled ? Theme.neonCyan.opacity(0.6) : Theme.amberWarn.opacity(0.5)
-        }
-        return isHovered ? Theme.neonCyan.opacity(0.35) : Color.white.opacity(0.06)
-    }
-
     private var tooltipText: String {
-        if let r = route {
-            return model.t("已连接：\(r.srcName) -> \(r.dstName) (点击断开)", "Connected: \(r.srcName) -> \(r.dstName) (Click to disconnect)")
+        let path = "\(inSlot.name) → \(outSlot.name)"
+        if route != nil {
+            return model.t("\(path) (已连接 · 点击断开)", "\(path) (Connected · Click to disconnect)")
         }
         if inSlot.endpointId.isEmpty || outSlot.endpointId.isEmpty {
-            return model.t("端点未分配，点击配置", "Endpoints unassigned, click to configure")
+            return model.t("\(path) (未配置端点)", "\(path) (Endpoints unassigned)")
         }
-        return model.t("点击直连：\(inSlot.name) -> \(outSlot.name)", "Click to connect: \(inSlot.name) -> \(outSlot.name)")
+        return model.t("\(path) (点击建立路由)", "\(path) (Click to connect)")
     }
 
     private func handleCellClick() {
@@ -834,6 +817,10 @@ struct CrossPointCell: View {
             model.removeRoute(id: r.routeId)
         } else {
             if !inSlot.endpointId.isEmpty && !outSlot.endpointId.isEmpty {
+                // 单输入路由切换
+                if let existing = model.routes.first(where: { $0.dstId == outSlot.endpointId }) {
+                    model.removeRoute(id: existing.routeId)
+                }
                 model.addRoute(
                     srcId: inSlot.endpointId,
                     srcName: inSlot.name,
@@ -914,6 +901,9 @@ struct AddRouteSheet: View {
                 } else if let c = model.cables.first {
                     dstId = c.cableId
                     dstName = c.name
+                } else if let tx = model.txStreams.first {
+                    dstId = tx.name
+                    dstName = "VBAN [\(tx.name)]"
                 }
             }
         }
@@ -1006,6 +996,14 @@ struct AddRouteSheet: View {
                         }
                     }
                 }
+                Section(model.t("网络发送流", "Network Outgoing Streams")) {
+                    ForEach(model.txStreams, id: \.name) { tx in
+                        Button(tx.name) {
+                            dstId = tx.name
+                            dstName = "VBAN [\(tx.name)]"
+                        }
+                    }
+                }
             } label: {
                 HStack {
                     Text(dstName.isEmpty ? model.t("选择输出目标...", "Select Destination...") : dstName)
@@ -1049,6 +1047,9 @@ struct AddRouteSheet: View {
 
             Button(action: {
                 guard !srcId.isEmpty, !dstId.isEmpty else { return }
+                if let existing = model.routes.first(where: { $0.dstId == dstId }) {
+                    model.removeRoute(id: existing.routeId)
+                }
                 model.addRoute(srcId: srcId, srcName: srcName, dstId: dstId, dstName: dstName, gain: gain)
                 isPresented = false
             }) {
