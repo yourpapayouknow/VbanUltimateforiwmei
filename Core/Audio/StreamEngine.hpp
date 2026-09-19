@@ -17,7 +17,7 @@ public:
     ~StrmEngn() { stpall(); }
 
     // 启动接收流回放：在指定输出设备上回放该流样本
-    bool strtrx(const DevInf& dev, const std::string& strm, uint32_t ch, uint32_t sr) {
+    bool strtrx(const DevInf& dev, const std::string& strm, uint32_t ch, uint32_t sr, uint32_t srch = 0) {
         // 建立输出音频单元并绑定流回放回调
         if (!rt_) return false;
         stprx();
@@ -26,6 +26,7 @@ public:
 
         rx_strm_ = strm;
         rx_ch_   = ch ? ch : dev.outchs;
+        rx_srch_ = srch;
         rx_cb_.inputProc       = &StrmEngn::rxcall;
         rx_cb_.inputProcRefCon = this;
 
@@ -212,16 +213,38 @@ private:
     static OSStatus rxcall(void* ref, AudioUnitRenderActionFlags*,
                            const AudioTimeStamp*, UInt32, UInt32 frames,
                            AudioBufferList* data) {
-        // 从流缓冲提取样本填充输出设备
+        // 从流缓冲提取样本并按设备声道映射输出
         auto* self = static_cast<StrmEngn*>(ref);
         if (!self || !data || data->mNumberBuffers == 0) return noErr;
 
         float* dst = static_cast<float*>(data->mBuffers[0].mData);
-        const uint32_t ch = data->mBuffers[0].mNumberChannels ? data->mBuffers[0].mNumberChannels : 1;
-        const size_t cnt = static_cast<size_t>(frames) * ch;
+        const uint32_t dch = data->mBuffers[0].mNumberChannels ? data->mBuffers[0].mNumberChannels : 1;
+        const size_t dcnt = static_cast<size_t>(frames) * dch;
 
-        if (self->rx_strm_.empty() || self->rt_->rdrx(self->rx_strm_, dst, cnt) != cnt) {
-            std::memset(dst, 0, cnt * sizeof(float));
+        const uint32_t sch = self->rx_srch_ ? self->rx_srch_ : dch;
+        if (self->rx_strm_.empty() || sch != dch) {
+            // 流声道与设备声道不一致时经暂存区重映射
+            const size_t scnt = static_cast<size_t>(frames) * sch;
+            if (self->rx_tmp_.size() < scnt) {
+                self->rx_tmp_.resize(scnt, 0.0f);
+            }
+            if (self->rx_strm_.empty() ||
+                self->rt_->rdrx(self->rx_strm_, self->rx_tmp_.data(), scnt) != scnt) {
+                std::memset(dst, 0, dcnt * sizeof(float));
+                return noErr;
+            }
+            for (uint32_t f = 0; f < frames; ++f) {
+                for (uint32_t c = 0; c < dch; ++c) {
+                    // 声道不足时复制末声道，多余声道丢弃
+                    const uint32_t sc = (c < sch) ? c : (sch - 1);
+                    dst[f * dch + c] = self->rx_tmp_[f * sch + sc];
+                }
+            }
+            return noErr;
+        }
+
+        if (self->rt_->rdrx(self->rx_strm_, dst, dcnt) != dcnt) {
+            std::memset(dst, 0, dcnt * sizeof(float));
         }
         return noErr;
     }
@@ -261,10 +284,12 @@ private:
     std::string             rx_strm_;
     std::string             tx_strm_;
     uint32_t                rx_ch_{2};
+    uint32_t                rx_srch_{0};
     uint32_t                tx_ch_{1};
     AURenderCallbackStruct  rx_cb_{};
     AURenderCallbackStruct  tx_cb_{};
     std::vector<float>      cap_;
+    std::vector<float>      rx_tmp_;
     std::vector<uint8_t>    abl_;       // 输入渲染缓冲描述区
     uint32_t                tx_bmax_{4096};
 };

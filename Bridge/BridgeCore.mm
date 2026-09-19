@@ -467,13 +467,14 @@
         inf.outchs = dev.outChannels;
         inf.sr     = dev.sampleRate;
 
-        // 回放采样率必须取接收流自身速率，否则将发生变调与变速
-        const uint32_t sr = [self rxRateOfStream:strm];
+        // 回放采样率与声道数必须取接收流自身规格，否则将发生变调与声道错配
+        const uint32_t sr    = [self rxRateOfStream:strm];
+        const uint32_t srch  = [self rxChanOfStream:strm];
         inf.sr = sr;
 
-        rt_->setrxdev([strm UTF8String], [dev.uid UTF8String], dev.outChannels, sr);
-        rt_->rstbuf([strm UTF8String], dev.outChannels, sr);
-        if (seng_->strtrx(inf, [strm UTF8String], dev.outChannels, sr)) {
+        rt_->setrxdev([strm UTF8String], [dev.uid UTF8String], srch, sr);
+        rt_->rstbuf([strm UTF8String], srch, sr);
+        if (seng_->strtrx(inf, [strm UTF8String], dev.outChannels, sr, srch)) {
             rx_cur_ = strm;
             [rx_active_ addObject:strm];
         }
@@ -513,8 +514,10 @@
         const uint32_t sr = [self txRateOfStream:strm];
         inf.sr = sr;
 
-        rt_->settxdev([strm UTF8String], [dev.uid UTF8String], dev.inChannels, sr);
-        if (seng_->strttx(inf, [strm UTF8String], dev.inChannels, sr)) {
+        // 采集声道数按发送流规格，保证打包负载与配置一致
+        const uint32_t sch = [self txChanOfStream:strm];
+        rt_->settxdev([strm UTF8String], [dev.uid UTF8String], sch, sr);
+        if (seng_->strttx(inf, [strm UTF8String], sch, sr)) {
             tx_cur_ = strm;
             [tx_active_ addObject:strm];
         }
@@ -530,6 +533,27 @@
         if (want == s.strm && s.sr > 0) return s.sr;
     }
     return 48000;
+}
+
+// 查询发送流的声道数
+- (uint32_t)txChanOfStream:(NSString *)strm {
+    // 从发送流配置中取出该流声道数
+    const std::string want = [strm UTF8String];
+    for (const auto &s : tx_mgr_->gtsnaps()) {
+        if (want == s.strm && s.ch > 0) return s.ch;
+    }
+    return 2;
+}
+
+// 查询接收流的声道数
+- (uint32_t)rxChanOfStream:(NSString *)strm {
+    // 从接收流快照中取出该流声道数
+    auto snap = mtr_->gtsnap(is_run_.load());
+    const std::string want = [strm UTF8String];
+    for (const auto &s : snap.rx_snaps) {
+        if (want == s.strm && s.ch > 0) return s.ch;
+    }
+    return 2;
 }
 
 // 查询发送流的采样率
