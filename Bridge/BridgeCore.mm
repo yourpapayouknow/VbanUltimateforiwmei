@@ -467,9 +467,13 @@
         inf.outchs = dev.outChannels;
         inf.sr     = dev.sampleRate;
 
-        rt_->setrxdev([strm UTF8String], [dev.uid UTF8String], dev.outChannels, 48000);
-        rt_->rstbuf([strm UTF8String], dev.outChannels, 48000);
-        if (seng_->strtrx(inf, [strm UTF8String], dev.outChannels)) {
+        // 回放采样率必须取接收流自身速率，否则将发生变调与变速
+        const uint32_t sr = [self rxRateOfStream:strm];
+        inf.sr = sr;
+
+        rt_->setrxdev([strm UTF8String], [dev.uid UTF8String], dev.outChannels, sr);
+        rt_->rstbuf([strm UTF8String], dev.outChannels, sr);
+        if (seng_->strtrx(inf, [strm UTF8String], dev.outChannels, sr)) {
             rx_cur_ = strm;
             [rx_active_ addObject:strm];
         }
@@ -505,12 +509,37 @@
         inf.outchs = dev.outChannels;
         inf.sr     = dev.sampleRate;
 
-        rt_->settxdev([strm UTF8String], [dev.uid UTF8String], dev.inChannels, 48000);
-        if (seng_->strttx(inf, [strm UTF8String], dev.inChannels)) {
+        // 采集采样率取发送流自身配置速率
+        const uint32_t sr = [self txRateOfStream:strm];
+        inf.sr = sr;
+
+        rt_->settxdev([strm UTF8String], [dev.uid UTF8String], dev.inChannels, sr);
+        if (seng_->strttx(inf, [strm UTF8String], dev.inChannels, sr)) {
             tx_cur_ = strm;
             [tx_active_ addObject:strm];
         }
     }
+}
+
+// 查询接收流的采样率
+- (uint32_t)rxRateOfStream:(NSString *)strm {
+    // 从接收流快照中取出该流采样率
+    auto snap = mtr_->gtsnap(is_run_.load());
+    const std::string want = [strm UTF8String];
+    for (const auto &s : snap.rx_snaps) {
+        if (want == s.strm && s.sr > 0) return s.sr;
+    }
+    return 48000;
+}
+
+// 查询发送流的采样率
+- (uint32_t)txRateOfStream:(NSString *)strm {
+    // 从发送流配置中取出该流采样率
+    const std::string want = [strm UTF8String];
+    for (const auto &s : tx_mgr_->gtsnaps()) {
+        if (want == s.strm && s.sr > 0) return s.sr;
+    }
+    return 48000;
 }
 
 // 按线缆标识检索对应音频设备

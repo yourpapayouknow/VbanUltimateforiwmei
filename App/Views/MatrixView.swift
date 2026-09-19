@@ -313,6 +313,7 @@ struct MatrixCanvasView: View {
                         onSelectEndpoint: { newId, newName, newType in
                             model.setOutSlot(id: outSlot.id, endpointId: newId, name: newName, typeDesc: newType)
                         },
+                        onDelete: { model.removeOutSlot(id: outSlot.id) },
                     )
                     .frame(width: cellSlotSize, height: cellSlotSize)
                 }
@@ -340,6 +341,7 @@ struct MatrixCanvasView: View {
                         onSelectEndpoint: { newId, newName, newType in
                             model.setInSlot(id: inSlot.id, endpointId: newId, name: newName, typeDesc: newType)
                         },
+                        onDelete: { model.removeInSlot(id: inSlot.id) },
                     )
                     .frame(width: inSlotWidth, height: cellSlotSize)
 
@@ -475,6 +477,7 @@ struct OutputEndpointHeader: View {
     let width: CGFloat
     let height: CGFloat
     let onSelectEndpoint: (String, String, String) -> Void
+    let onDelete: () -> Void
 
     var body: some View {
         VStack(spacing: 4) {
@@ -530,6 +533,17 @@ struct OutputEndpointHeader: View {
                 .frame(width: 22, height: 22)
                 .help(model.t("修改/切换此输出端点", "Change output destination"))
 
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.alertRed.opacity(0.8))
+                        .frame(width: 22, height: 22)
+                        .background(Theme.btnBg)
+                        .cornerRadius(4)
+                }
+                .buttonStyle(.plain)
+                .help(model.t("删除此输出通道", "Remove this output channel"))
+
             }
         }
         .padding(6)
@@ -553,6 +567,7 @@ struct InputEndpointHeader: View {
     let width: CGFloat
     let height: CGFloat
     let onSelectEndpoint: (String, String, String) -> Void
+    let onDelete: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
@@ -610,6 +625,17 @@ struct InputEndpointHeader: View {
                 .menuIndicator(.hidden)
                 .frame(width: 22, height: 22)
                 .help(model.t("修改/切换此输入端点", "Change input source"))
+
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.alertRed.opacity(0.8))
+                        .frame(width: 22, height: 22)
+                        .background(Theme.btnBg)
+                        .cornerRadius(4)
+                }
+                .buttonStyle(.plain)
+                .help(model.t("删除此输入通道", "Remove this input channel"))
 
             }
         }

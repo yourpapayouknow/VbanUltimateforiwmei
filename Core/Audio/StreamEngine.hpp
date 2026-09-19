@@ -17,12 +17,12 @@ public:
     ~StrmEngn() { stpall(); }
 
     // 启动接收流回放：在指定输出设备上回放该流样本
-    bool strtrx(const DevInf& dev, const std::string& strm, uint32_t ch) {
+    bool strtrx(const DevInf& dev, const std::string& strm, uint32_t ch, uint32_t sr) {
         // 建立输出音频单元并绑定流回放回调
         if (!rt_) return false;
         stprx();
 
-        if (openunit(dev.id, ch, false) != noErr) return false;
+        if (openunit(dev.id, ch, false, sr) != noErr) return false;
 
         rx_strm_ = strm;
         rx_ch_   = ch ? ch : dev.outchs;
@@ -63,12 +63,12 @@ public:
     }
 
     // 启动发送流采集：从指定输入设备采集样本
-    bool strttx(const DevInf& dev, const std::string& strm, uint32_t ch) {
+    bool strttx(const DevInf& dev, const std::string& strm, uint32_t ch, uint32_t sr) {
         // 建立输入音频单元并绑定流采集回调
         if (!rt_) return false;
         stptx();
 
-        if (openunit(dev.id, ch, true) != noErr) return false;
+        if (openunit(dev.id, ch, true, sr) != noErr) return false;
 
         tx_strm_ = strm;
         tx_ch_   = ch ? ch : (dev.inchs ? dev.inchs : 1);
@@ -123,7 +123,7 @@ public:
 
 private:
     // 打开指定设备的音频单元
-    OSStatus openunit(AudioDeviceID dev_id, uint32_t ch, bool for_in) {
+    OSStatus openunit(AudioDeviceID dev_id, uint32_t ch, bool for_in, uint32_t sr) {
         // 按方向配置 HAL 音频单元与浮点流格式
         AudioComponentDescription desc{};
         desc.componentType         = kAudioUnitType_Output;
@@ -161,7 +161,7 @@ private:
 
         // 统一采用 32 位浮点非线性交织格式交换样本
         AudioStreamBasicDescription asbd{};
-        asbd.mSampleRate       = 0;
+        asbd.mSampleRate       = sr > 0 ? static_cast<Float64>(sr) : 0;
         asbd.mFormatID         = kAudioFormatLinearPCM;
         asbd.mFormatFlags      = kAudioFormatFlagIsFloat | kAudioFormatFlagsNativeEndian | kAudioFormatFlagIsPacked;
         asbd.mBitsPerChannel   = 32;
@@ -184,15 +184,15 @@ private:
                              cscp, 0, &asbd, sizeof(asbd));
 
         if (for_in) {
-        // 预取输入侧缓冲参数供实时回调使用
-        UInt32 bsz = sizeof(tx_bmax_);
-        if (AudioUnitGetProperty(unit, kAudioDevicePropertyBufferFrameSize,
-                                 kAudioUnitScope_Global, 0, &tx_bmax_, &bsz) != noErr) {
-            tx_bmax_ = 4096;
-        }
-        // 预分配渲染请求描述区，避免实时回调内分配
-        abl_.assign(sizeof(AudioBufferList) + sizeof(AudioBuffer), 0);
-        tx_unit_ = unit;
+            // 预取输入侧缓冲参数供实时回调使用
+            UInt32 bsz = sizeof(tx_bmax_);
+            if (AudioUnitGetProperty(unit, kAudioDevicePropertyBufferFrameSize,
+                                     kAudioUnitScope_Global, 0, &tx_bmax_, &bsz) != noErr) {
+                tx_bmax_ = 4096;
+            }
+            // 预分配渲染请求描述区，避免实时回调内分配
+            abl_.assign(sizeof(AudioBufferList) + sizeof(AudioBuffer), 0);
+            tx_unit_ = unit;
         } else {
             rx_unit_ = unit;
         }
