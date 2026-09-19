@@ -8,6 +8,8 @@ struct VbanPingSheet: View {
 
     @State private var sendFeedback: String? = nil
 
+    @State private var isCloseHovered: Bool = false
+
     // 当前展示的 Ping 记录
     private var record: VbanPingRecord? {
         if let tip = targetIp, !tip.isEmpty {
@@ -22,27 +24,35 @@ struct VbanPingSheet: View {
         VStack(spacing: 0) {
             // 顶栏标头
             HStack {
-                Text("VBAN Ping")
-                    .font(Theme.cnText(13, weight: .semibold))
-                    .foregroundColor(Theme.textSecondary)
-
-                Spacer()
-
                 Button(action: { isPresented = false }) {
-                    Text("✕")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Theme.textTertiary)
-                        .padding(4)
+                    ZStack {
+                        Circle()
+                            .fill(Color(red: 1.0, green: 0.36, blue: 0.34))
+                            .frame(width: 12, height: 12)
+
+                        if isCloseHovered {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 7, weight: .black))
+                                .foregroundColor(Color.black.opacity(0.65))
+                        }
+                    }
+                    .frame(width: 14, height: 14)
+                    .contentShape(Circle())
                 }
                 .buttonStyle(PlainButtonStyle())
                 .keyboardShortcut(.cancelAction)
+                .onHover { hovering in
+                    isCloseHovered = hovering
+                }
                 .help(model.t("关闭窗口 (Esc)", "Close Window (Esc)"))
+
+                Spacer()
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 16)
             .padding(.top, 14)
             .padding(.bottom, 10)
 
-            Divider().background(Color.white.opacity(0.12))
+            Divider().background(Theme.borderSubtle)
 
             Spacer()
 
@@ -67,48 +77,39 @@ struct VbanPingSheet: View {
                         .transition(.opacity)
                 }
 
-                HStack(spacing: 14) {
-                    Button(model.t("关闭", "Close")) {
-                        isPresented = false
-                    }
-                    .keyboardShortcut(.cancelAction)
-                    .font(Theme.cnText(12.5, weight: .medium))
-                    .foregroundColor(Theme.textSecondary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-
-                    Button(action: handleSendPing) {
-                        Text("Send VBAN-Ping...")
-                            .font(Theme.cnText(12.5, weight: .medium))
-                            .foregroundColor(Theme.textPrimary)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 6)
-                            .background(Color.white.opacity(0.14))
-                            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                    }
+                Button(action: handleSendPing) {
+                    Text("Send VBAN-Ping...")
+                        .font(Theme.cnText(12, weight: .semibold))
+                        .foregroundColor(Theme.neonCyan)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 6)
+                        .background(Theme.neonCyan.opacity(0.16))
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .stroke(Theme.neonCyan.opacity(0.4), lineWidth: 1)
+                        )
                 }
                 .buttonStyle(PlainButtonStyle())
             }
             .padding(.bottom, 16)
         }
-        .frame(width: 520, height: 300)
-        .background(Color(red: 0.16, green: 0.19, blue: 0.22))
+        .frame(width: 500, height: 290)
+        .background(Theme.windowBg)
     }
 
     // 属性键值行
     private func propertyRow(label: String, value: String) -> some View {
         HStack(spacing: 16) {
             Text(label)
-                .font(Theme.cnText(13, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.70))
-                .frame(width: 170, alignment: .trailing)
+                .font(Theme.cnText(12.5, weight: .medium))
+                .foregroundColor(Theme.textSecondary)
+                .frame(width: 160, alignment: .trailing)
 
             Text(value)
-                .font(Theme.monoDigit(13, weight: .semibold))
-                .foregroundColor(Color.white.opacity(0.92))
-                .frame(width: 220, alignment: .leading)
+                .font(Theme.monoDigit(12.5, weight: .semibold))
+                .foregroundColor(Theme.textPrimary)
+                .frame(width: 230, alignment: .leading)
         }
     }
 
