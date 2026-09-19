@@ -150,6 +150,7 @@ final class AppModel: ObservableObject {
     }() {
         didSet {
             UserDefaults.standard.set(themeStyle.rawValue, forKey: "app_theme_style")
+            applyThemeStyle(themeStyle)
         }
     }
 
@@ -254,6 +255,40 @@ final class AppModel: ObservableObject {
         pasteboard.setString(hostIpAddress, forType: .string)
     }
 
+    // 同步外观样式到系统 AppKit 窗口
+    func applyThemeStyle(_ style: AppThemeStyle) {
+        DispatchQueue.main.async {
+            switch style {
+            case .system:
+                NSApp.appearance = nil
+                for win in NSApp.windows {
+                    win.appearance = nil
+                }
+            case .dark:
+                let darkApp = NSAppearance(named: .darkAqua)
+                NSApp.appearance = darkApp
+                for win in NSApp.windows {
+                    win.appearance = darkApp
+                }
+            case .light:
+                let lightApp = NSAppearance(named: .aqua)
+                NSApp.appearance = lightApp
+                for win in NSApp.windows {
+                    win.appearance = lightApp
+                }
+            }
+        }
+    }
+
+    // 系统全局主题变更通知响应
+    @objc private func handleSystemThemeChange() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, self.themeStyle == .system else { return }
+            self.applyThemeStyle(.system)
+            self.objectWillChange.send()
+        }
+    }
+
     private var timer: Timer?
     private let bridge = VbanBridge.shared()
 
@@ -262,10 +297,18 @@ final class AppModel: ObservableObject {
         bridge.setNetworkQuality(networkQuality.rawValue)
         bridge.setBufferingFrames(bufferingFrames)
         loadTxStreams()
+        applyThemeStyle(themeStyle)
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(handleSystemThemeChange),
+            name: NSNotification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil
+        )
         start()
     }
 
     deinit {
+        DistributedNotificationCenter.default().removeObserver(self)
         stop()
     }
 

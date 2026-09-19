@@ -25,6 +25,9 @@ struct MainContainerView: View {
         .background(Theme.windowBg)
         .frame(minWidth: 960, idealWidth: 1020, minHeight: 580, idealHeight: 620)
         .preferredColorScheme(model.themeStyle.colorScheme)
+        .onAppear {
+            model.applyThemeStyle(model.themeStyle)
+        }
         .toolbar {
             // 原生居中分段控制器 (Logic Pro / Xcode 原生风格，严格固定宽度)
             ToolbarItem(placement: .principal) {
