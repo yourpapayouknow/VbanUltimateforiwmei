@@ -31,6 +31,8 @@ cat << 'EOF' > "$APP_DIR/Contents/Info.plist"
     <key>CFBundleExecutable</key>
     <string>VBANUltimate</string>
     <key>CFBundleIconFile</key>
+    <string>AppIcon.icns</string>
+    <key>CFBundleIconName</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.iwmei.vbanultimate</string>
@@ -75,5 +77,10 @@ swiftc -O \
     -framework AppKit \
     -o "$MACOS_DIR/VBANUltimate"
 
-echo "Application built successfully at: $APP_DIR"
+# 4. 代码签名
+echo "Signing VBAN Ultimate application bundle..."
+codesign --force --deep --sign - "$APP_DIR"
+codesign -dvvv "$APP_DIR" 2>&1 | grep -E "Identifier|Signature|Sealed"
+
+echo "Application built and signed successfully at: $APP_DIR"
 file "$MACOS_DIR/VBANUltimate"
