@@ -6,6 +6,7 @@
 #include "../VBAN/Parser.hpp"
 #include "../Monitoring/StreamStats.hpp"
 #include "JitterBuffer.hpp"
+#include "PingManager.hpp"
 
 namespace vban {
 
@@ -71,6 +72,13 @@ public:
 
     // 分分解码并分发单个网络数据包
     bool dmxpkt(const uint8_t* dat, size_t len, const char* sip, uint16_t sprt) {
+        // 服务协议探测报文优先分发
+        if (len >= kHdrSz && (dat[4] & 0xE0) == 0x60) {
+            if (PingMgr::inst().prspkt(dat, len, sip, sprt)) {
+                return true;
+            }
+        }
+
         // 将收到的数据包精准路由至对应流上下文
         PktInf inf{};
         if (!prspkt(dat, len, &inf)) {

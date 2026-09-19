@@ -6,6 +6,7 @@
 #include "../Core/VBAN/Packetizer.hpp"
 #include "../Core/Network/UdpSocket.hpp"
 #include "../Core/Network/Demuxer.hpp"
+#include "../Core/Network/PingManager.hpp"
 #include "../Core/Audio/DeviceCatalog.hpp"
 #include "../Core/Audio/CableManager.hpp"
 #include "../Core/Routing/MatrixRouter.hpp"
@@ -32,6 +33,9 @@
 @end
 
 @implementation VbanConflictProcess
+@end
+
+@implementation VbanPingRecord
 @end
 
 @interface VbanBridge () {
@@ -408,6 +412,55 @@
     }
     m.rxStreams = strms;
     return m;
+}
+
+// 获取全部已接收 Ping 节点
+- (NSArray<VbanPingRecord *> *)getPingRecords {
+    auto nodes = vban::PingMgr::inst().gtall();
+    NSMutableArray<VbanPingRecord *> *arr = [NSMutableArray array];
+    for (const auto& n : nodes) {
+        VbanPingRecord *rec = [[VbanPingRecord alloc] init];
+        rec.ip = [NSString stringWithUTF8String:n.ip.c_str()];
+        rec.port = n.port;
+        rec.username = [NSString stringWithUTF8String:n.userName.c_str()];
+        rec.hostname = [NSString stringWithUTF8String:n.hostName.c_str()];
+        rec.application = [NSString stringWithUTF8String:n.applicationName.c_str()];
+        rec.langCountry = [NSString stringWithUTF8String:n.langCountry.c_str()];
+        rec.timeStamp = [NSString stringWithUTF8String:n.timeStamp.c_str()];
+        rec.version = [NSString stringWithUTF8String:n.version.c_str()];
+        rec.isReceived = n.isReceived;
+        [arr addObject:rec];
+    }
+    return arr;
+}
+
+// 获取最新 Ping 节点记录
+- (nullable VbanPingRecord *)getLatestPingRecord {
+    vban::PingNode n{};
+    if (!vban::PingMgr::inst().gtlatest(&n)) {
+        return nil;
+    }
+    VbanPingRecord *rec = [[VbanPingRecord alloc] init];
+    rec.ip = [NSString stringWithUTF8String:n.ip.c_str()];
+    rec.port = n.port;
+    rec.username = [NSString stringWithUTF8String:n.userName.c_str()];
+    rec.hostname = [NSString stringWithUTF8String:n.hostName.c_str()];
+    rec.application = [NSString stringWithUTF8String:n.applicationName.c_str()];
+    rec.langCountry = [NSString stringWithUTF8String:n.langCountry.c_str()];
+    rec.timeStamp = [NSString stringWithUTF8String:n.timeStamp.c_str()];
+    rec.version = [NSString stringWithUTF8String:n.version.c_str()];
+    rec.isReceived = n.isReceived;
+    return rec;
+}
+
+// 发送 VBAN Ping 探测报文
+- (BOOL)sendVbanPingToIp:(NSString *)ip port:(uint16_t)port appName:(NSString *)appName userName:(NSString *)userName hostName:(NSString *)hostName langCode:(NSString *)langCode {
+    const char* c_ip = ip ? [ip UTF8String] : "255.255.255.255";
+    const char* c_app = appName ? [appName UTF8String] : "VBAN Ultimate";
+    const char* c_user = userName ? [userName UTF8String] : "";
+    const char* c_host = hostName ? [hostName UTF8String] : "";
+    const char* c_lang = langCode ? [langCode UTF8String] : "zh-cn";
+    return vban::PingMgr::inst().sndping(c_ip, port, c_app, c_user, c_host, c_lang);
 }
 
 @end

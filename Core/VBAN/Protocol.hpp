@@ -40,6 +40,41 @@ struct PktInf {
     const uint8_t* pyld;
 };
 
+// 服务协议常量
+inline constexpr uint8_t kServiceIdentification = 0;
+inline constexpr uint8_t kServiceFnctPing0       = 0;
+inline constexpr uint8_t kServiceFnctReply       = 0x80;
+
+#pragma pack(push, 1)
+// VBAN PING0 官方数据载荷结构
+struct VbanPing0Payload {
+    uint32_t bitType;             // VBAN 设备能力类型
+    uint32_t bitfeature;          // 支持的协议特性
+    uint32_t bitfeatureEx;        // 扩展特性掩码
+    uint32_t preferedRate;        // 首选采样率
+    uint32_t minRate;             // 支持的最低采样率
+    uint32_t maxRate;             // 支持的最高采样率
+    uint32_t colorRgb;            // 用户颜色值
+    uint8_t  nVersion[4];         // 应用版本号
+    char     gpsPosition[8];      // GPS 定位数据
+    char     userPosition[8];     // 用户进程定位数据
+    char     langCode[8];         // 用户主要语言地区代码
+    char     reservedAscii[8];    // 保留字段
+    char     reservedEx[64];      // 扩展保留字段
+    char     distantIp[32];       // 对端 IP
+    uint16_t distantPort;         // 对端端口
+    uint16_t distantReserved;     // 对端保留
+    char     deviceName[64];      // 物理设备名称
+    char     manufacturerName[64];// 制造商品牌名称
+    char     applicationName[64]; // 应用程序名称
+    char     hostName[64];        // 网络主机名
+    char     userName[128];       // 用户名
+    char     userComment[128];    // 用户备注信息
+};
+#pragma pack(pop)
+
+static_assert(sizeof(VbanPing0Payload) == 676, "VBAN PING0 payload must be exactly 676 bytes");
+
 } // namespace vban
 
 #endif // VBAN_PROTOCOL_HPP

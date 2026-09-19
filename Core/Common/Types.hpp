@@ -17,6 +17,7 @@ enum class ProtoSub : uint8_t {
     Audio   = 0x00,
     Serial  = 0x20,
     Txt     = 0x40,
+    Service = 0x60,
     Undef1  = 0x80,
     Undef2  = 0xA0,
     Undef3  = 0xC0,

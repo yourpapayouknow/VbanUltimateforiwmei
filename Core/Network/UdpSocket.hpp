@@ -59,6 +59,13 @@ public:
         return true;
     }
 
+    // 开启广播发送权限
+    bool enbldcast() {
+        if (fd_ < 0) return false;
+        int opt = 1;
+        return ::setsockopt(fd_, SOL_SOCKET, SO_BROADCAST, &opt, sizeof(opt)) == 0;
+    }
+
     // 绑定本地监听端口
     bool bndsck(uint16_t prt) {
         // 将套接字绑定至指定端口

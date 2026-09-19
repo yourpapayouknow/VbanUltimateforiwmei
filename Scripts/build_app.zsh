@@ -64,6 +64,7 @@ swiftc -O \
     "$PROJECT_DIR/App/Views/MatrixView.swift" \
     "$PROJECT_DIR/App/Views/CablesView.swift" \
     "$PROJECT_DIR/App/Views/MonitoringView.swift" \
+    "$PROJECT_DIR/App/Views/VbanPingSheet.swift" \
     "$PROJECT_DIR/App/Views/SettingsView.swift" \
     "$PROJECT_DIR/App/Views/MainContainerView.swift" \
     "$PROJECT_DIR/App/VBANUltimateApp.swift" \

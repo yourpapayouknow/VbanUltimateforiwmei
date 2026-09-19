@@ -171,6 +171,10 @@ final class AppModel: ObservableObject {
     @Published var conflictProcesses: [VbanConflictProcess] = []
     @Published var showConflictDiagAlert: Bool = false
 
+    // VBAN Ping 记录
+    @Published var pingRecords: [VbanPingRecord] = []
+    @Published var latestPing: VbanPingRecord? = nil
+
     // 本机网络 IP 与节点用户名
     @Published var hostIpAddress: String = ""
     @Published var username: String = {
@@ -316,6 +320,20 @@ final class AppModel: ObservableObject {
         metrics = bridge.getSnapshot()
         metrics.activeTx = UInt32(txStreams.filter(\.enabled).count)
         isPortConflict = metrics.portConflict
+        latestPing = bridge.getLatestPingRecord()
+        pingRecords = bridge.getPingRecords()
+    }
+
+    // 发送本机 VBAN Ping 探测
+    @discardableResult
+    func sendPing(to ip: String = "255.255.255.255", port: UInt16 = 6980) -> Bool {
+        let langCode = language == .chinese ? "zh-cn" : "en-us"
+        let host = ProcessInfo.processInfo.hostName
+        let user = username
+        let app = "VBAN Ultimate"
+        let ok = bridge.sendVbanPing(toIp: ip, port: port, appName: app, userName: user, hostName: host, langCode: langCode)
+        pollMetrics()
+        return ok
     }
 
     // 发送流管理

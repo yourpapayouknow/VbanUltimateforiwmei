@@ -86,6 +86,19 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSString *name;
 @end
 
+// VBAN Ping 节点记录结构
+@interface VbanPingRecord : NSObject
+@property (nonatomic, copy) NSString *ip;
+@property (nonatomic, assign) uint16_t port;
+@property (nonatomic, copy) NSString *username;
+@property (nonatomic, copy) NSString *hostname;
+@property (nonatomic, copy) NSString *application;
+@property (nonatomic, copy) NSString *langCountry;
+@property (nonatomic, copy) NSString *timeStamp;
+@property (nonatomic, copy) NSString *version;
+@property (nonatomic, assign) BOOL isReceived;
+@end
+
 // 桥接层中央管理类
 @interface VbanBridge : NSObject
 
@@ -129,6 +142,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 // 全局指标快照 (500ms 轮询)
 - (VbanAppMetric *)getSnapshot;
+
+// VBAN Ping 服务功能
+- (NSArray<VbanPingRecord *> *)getPingRecords;
+- (nullable VbanPingRecord *)getLatestPingRecord;
+- (BOOL)sendVbanPingToIp:(NSString *)ip port:(uint16_t)port appName:(NSString *)appName userName:(NSString *)userName hostName:(NSString *)hostName langCode:(NSString *)langCode;
 
 @end
 

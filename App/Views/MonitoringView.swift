@@ -3,6 +3,8 @@ import SwiftUI
 // 监控诊断主视图
 struct MonitoringView: View {
     @ObservedObject var model: AppModel
+    @State private var showPingSheet: Bool = false
+    @State private var selectedPingIp: String? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,6 +23,9 @@ struct MonitoringView: View {
             }
         }
         .background(Theme.windowBg)
+        .sheet(isPresented: $showPingSheet) {
+            VbanPingSheet(model: model, targetIp: selectedPingIp, isPresented: $showPingSheet)
+        }
     }
 
     // 全流是否为空判断
@@ -31,6 +36,25 @@ struct MonitoringView: View {
     // 顶部操作工具条
     private var topToolbar: some View {
         HStack(spacing: 8) {
+            Button(action: {
+                selectedPingIp = nil
+                showPingSheet = true
+            }) {
+                Text("VBAN Ping")
+                    .font(Theme.monoDigit(11.5, weight: .bold))
+                    .foregroundColor(Theme.neonCyan)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4.5)
+                    .background(Theme.neonCyan.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .stroke(Theme.neonCyan.opacity(0.4), lineWidth: 1)
+                    )
+            }
+            .buttonStyle(PlainButtonStyle())
+            .help(model.t("打开 VBAN Ping 服务节点诊断面板", "Open VBAN Ping diagnostic inspector"))
+
             Spacer()
 
             ParamCapsule(
@@ -72,31 +96,34 @@ struct MonitoringView: View {
     private var tableHeader: some View {
         HStack(spacing: 6) {
             Text(model.t("状态", "Status"))
-                .frame(width: 26, alignment: .center)
+                .frame(width: 24, alignment: .center)
             Text(model.t("类型", "Type"))
-                .frame(width: 36, alignment: .center)
+                .frame(width: 32, alignment: .center)
             Text(model.t("流标识", "Stream ID"))
-                .frame(width: 110, alignment: .leading)
+                .frame(width: 105, alignment: .leading)
             Text(model.t("端点地址", "Endpoint"))
-                .frame(width: 130, alignment: .leading)
+                .frame(width: 125, alignment: .leading)
             Text(model.t("音频规格", "Format"))
-                .frame(width: 140, alignment: .leading)
+                .frame(width: 130, alignment: .leading)
+
+            Spacer()
+
             Text(model.t("有效带宽", "Bandwidth"))
-                .frame(width: 75, alignment: .trailing)
+                .frame(width: 72, alignment: .trailing)
             Text(model.t("网络包率", "Packet Rate"))
-                .frame(width: 68, alignment: .trailing)
+                .frame(width: 64, alignment: .trailing)
             Text(model.t("丢包", "Missing"))
-                .frame(width: 46, alignment: .trailing)
+                .frame(width: 40, alignment: .trailing)
             Text(model.t("乱序", "Disorder"))
-                .frame(width: 46, alignment: .trailing)
+                .frame(width: 40, alignment: .trailing)
             Text(model.t("欠载", "Underrun"))
-                .frame(width: 46, alignment: .trailing)
+                .frame(width: 40, alignment: .trailing)
             Text(model.t("过载", "Overload"))
-                .frame(width: 46, alignment: .trailing)
+                .frame(width: 40, alignment: .trailing)
             Text(model.t("损坏", "Corrupt"))
-                .frame(width: 46, alignment: .trailing)
+                .frame(width: 40, alignment: .trailing)
             Text(model.t("网络抖动", "Jitter"))
-                .frame(minWidth: 60, maxWidth: .infinity, alignment: .trailing)
+                .frame(width: 56, alignment: .trailing)
         }
         .font(Theme.cnText(11, weight: .bold))
         .foregroundColor(Theme.textTertiary)
@@ -128,7 +155,7 @@ struct MonitoringView: View {
     private func rxTelemetryRow(idx: Int, strm: VbanStrmMetric) -> some View {
         HStack(spacing: 6) {
             StatusLed(isActive: strm.status == "Active")
-                .frame(width: 26, alignment: .center)
+                .frame(width: 24, alignment: .center)
 
             Text("RX")
                 .font(Theme.monoDigit(10.5, weight: .bold))
@@ -137,59 +164,68 @@ struct MonitoringView: View {
                 .padding(.vertical, 1.5)
                 .background(Theme.neonCyan.opacity(0.15))
                 .cornerRadius(3)
-                .frame(width: 36, alignment: .center)
+                .frame(width: 32, alignment: .center)
 
             RollingLabel(text: strm.name, font: Theme.monoDigit(13, weight: .bold), color: Theme.textPrimary)
-                .frame(width: 110, alignment: .leading)
+                .frame(width: 105, alignment: .leading)
 
-            Text("\(strm.srcIp):\(strm.srcPort)")
-                .font(Theme.monoDigit(11.5, weight: .medium))
-                .foregroundColor(Theme.textSecondary)
-                .lineLimit(1)
-                .frame(width: 130, alignment: .leading)
+            Button(action: {
+                selectedPingIp = strm.srcIp
+                showPingSheet = true
+            }) {
+                Text("\(strm.srcIp):\(strm.srcPort)")
+                    .font(Theme.monoDigit(11.5, weight: .medium))
+                    .foregroundColor(Theme.textSecondary)
+                    .lineLimit(1)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .frame(width: 125, alignment: .leading)
+            .help(model.t("点击查看端点 \(strm.srcIp) 的 VBAN Ping 属性", "Click to inspect VBAN Ping for \(strm.srcIp)"))
 
             formatCapsuleGroup(sr: strm.sampleRate, ch: strm.channels, bit: strm.bitDepth)
-                .frame(width: 140, alignment: .leading)
+                .frame(width: 130, alignment: .leading)
+
+            Spacer()
 
             Text("\(fmtKbps(strm.kbps)) kbps")
                 .font(Theme.monoDigit(12, weight: .bold))
                 .foregroundColor(Theme.neonCyan)
-                .frame(width: 75, alignment: .trailing)
+                .frame(width: 72, alignment: .trailing)
 
             Text("\(strm.packetsPerSec) pkt/s")
                 .font(Theme.monoDigit(11.5, weight: .semibold))
                 .foregroundColor(Theme.textSecondary)
-                .frame(width: 68, alignment: .trailing)
+                .frame(width: 64, alignment: .trailing)
 
             Text("\(strm.lostCount)")
                 .font(Theme.monoDigit(11.5, weight: .bold))
                 .foregroundColor(strm.lostCount > 0 ? Theme.alertRed : Theme.meterGreen)
-                .frame(width: 46, alignment: .trailing)
+                .frame(width: 40, alignment: .trailing)
 
             Text("\(strm.orderErrorCount)")
                 .font(Theme.monoDigit(11.5, weight: .semibold))
                 .foregroundColor(strm.orderErrorCount > 0 ? Theme.amberWarn : Theme.textTertiary)
-                .frame(width: 46, alignment: .trailing)
+                .frame(width: 40, alignment: .trailing)
 
             Text("\(strm.underrunCount)")
                 .font(Theme.monoDigit(11.5, weight: .bold))
                 .foregroundColor(strm.underrunCount > 0 ? Theme.alertRed : Theme.textTertiary)
-                .frame(width: 46, alignment: .trailing)
+                .frame(width: 40, alignment: .trailing)
 
             Text("\(strm.overloadCount)")
                 .font(Theme.monoDigit(11.5, weight: .semibold))
                 .foregroundColor(strm.overloadCount > 0 ? Theme.amberWarn : Theme.textTertiary)
-                .frame(width: 46, alignment: .trailing)
+                .frame(width: 40, alignment: .trailing)
 
             Text("\(strm.corruptCount)")
                 .font(Theme.monoDigit(11.5, weight: .semibold))
                 .foregroundColor(strm.corruptCount > 0 ? Theme.alertRed : Theme.textTertiary)
-                .frame(width: 46, alignment: .trailing)
+                .frame(width: 40, alignment: .trailing)
 
             Text(String(format: "%.1f ms", strm.jitterMs))
                 .font(Theme.monoDigit(11.5, weight: .semibold))
                 .foregroundColor(strm.jitterMs > 20.0 ? Theme.amberWarn : Theme.meterGreen)
-                .frame(minWidth: 60, maxWidth: .infinity, alignment: .trailing)
+                .frame(width: 56, alignment: .trailing)
         }
         .padding(.horizontal, 16)
         .frame(height: 38)
@@ -200,7 +236,7 @@ struct MonitoringView: View {
     private func txTelemetryRow(idx: Int, tx: VbanTxStreamDesc) -> some View {
         HStack(spacing: 6) {
             StatusLed(isActive: tx.enabled)
-                .frame(width: 26, alignment: .center)
+                .frame(width: 24, alignment: .center)
 
             Text("TX")
                 .font(Theme.monoDigit(10.5, weight: .bold))
@@ -209,59 +245,68 @@ struct MonitoringView: View {
                 .padding(.vertical, 1.5)
                 .background(Theme.amberWarn.opacity(0.15))
                 .cornerRadius(3)
-                .frame(width: 36, alignment: .center)
+                .frame(width: 32, alignment: .center)
 
             RollingLabel(text: tx.name, font: Theme.monoDigit(13, weight: .bold), color: Theme.textPrimary)
-                .frame(width: 110, alignment: .leading)
+                .frame(width: 105, alignment: .leading)
 
-            Text("\(tx.targetIp):\(tx.targetPort)")
-                .font(Theme.monoDigit(11.5, weight: .medium))
-                .foregroundColor(Theme.textSecondary)
-                .lineLimit(1)
-                .frame(width: 130, alignment: .leading)
+            Button(action: {
+                selectedPingIp = tx.targetIp
+                showPingSheet = true
+            }) {
+                Text("\(tx.targetIp):\(tx.targetPort)")
+                    .font(Theme.monoDigit(11.5, weight: .medium))
+                    .foregroundColor(Theme.textSecondary)
+                    .lineLimit(1)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .frame(width: 125, alignment: .leading)
+            .help(model.t("点击查看端点 \(tx.targetIp) 的 VBAN Ping 属性", "Click to inspect VBAN Ping for \(tx.targetIp)"))
 
             formatCapsuleGroup(sr: tx.sampleRate, ch: tx.channels, bit: tx.bitDepth)
-                .frame(width: 140, alignment: .leading)
+                .frame(width: 130, alignment: .leading)
+
+            Spacer()
 
             Text("\(fmtKbps(tx.realKbps)) kbps")
                 .font(Theme.monoDigit(12, weight: .bold))
                 .foregroundColor(Theme.neonCyan)
-                .frame(width: 75, alignment: .trailing)
+                .frame(width: 72, alignment: .trailing)
 
             Text("\(tx.sampleRate / max(1, model.bufferingFrames)) pkt/s")
                 .font(Theme.monoDigit(11.5, weight: .semibold))
                 .foregroundColor(Theme.textSecondary)
-                .frame(width: 68, alignment: .trailing)
+                .frame(width: 64, alignment: .trailing)
 
             Text("0")
                 .font(Theme.monoDigit(11.5, weight: .bold))
                 .foregroundColor(Theme.meterGreen)
-                .frame(width: 46, alignment: .trailing)
+                .frame(width: 40, alignment: .trailing)
 
             Text("-")
                 .font(Theme.monoDigit(11.5, weight: .medium))
                 .foregroundColor(Theme.textTertiary)
-                .frame(width: 46, alignment: .trailing)
+                .frame(width: 40, alignment: .trailing)
 
             Text("-")
                 .font(Theme.monoDigit(11.5, weight: .medium))
                 .foregroundColor(Theme.textTertiary)
-                .frame(width: 46, alignment: .trailing)
+                .frame(width: 40, alignment: .trailing)
 
             Text("-")
                 .font(Theme.monoDigit(11.5, weight: .medium))
                 .foregroundColor(Theme.textTertiary)
-                .frame(width: 46, alignment: .trailing)
+                .frame(width: 40, alignment: .trailing)
 
             Text("-")
                 .font(Theme.monoDigit(11.5, weight: .medium))
                 .foregroundColor(Theme.textTertiary)
-                .frame(width: 46, alignment: .trailing)
+                .frame(width: 40, alignment: .trailing)
 
             Text("-")
                 .font(Theme.monoDigit(11.5, weight: .medium))
                 .foregroundColor(Theme.textTertiary)
-                .frame(minWidth: 60, maxWidth: .infinity, alignment: .trailing)
+                .frame(width: 56, alignment: .trailing)
         }
         .padding(.horizontal, 16)
         .frame(height: 38)
