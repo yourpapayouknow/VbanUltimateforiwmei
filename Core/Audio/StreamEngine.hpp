@@ -10,32 +10,40 @@ namespace vban {
 
 #if defined(__APPLE__)
 
-// 单条 VBAN 流的设备回放与采集调度引擎
+// 流的音频规格
+struct StrmCfg {
+    uint32_t ch{0};
+    uint32_t sr{0};
+    SmplFmt  fmt{SmplFmt::Int16};
+
+    // 比对流规格是否一致
+    bool opeq(const StrmCfg& o) const {
+        // 三者完全相同方视为同一规格
+        return ch == o.ch && sr == o.sr && fmt == o.fmt;
+    }
+};
+
+// 单条 VBAN 流的设备收发引擎
 class StrmEngn {
 public:
-    // 抖动缓冲解析函数签名
-    using JtrResl = std::function<std::shared_ptr<JtrBuf>(const std::string&)>;
-
     explicit StrmEngn(std::shared_ptr<RtEngn> rt) : rt_(std::move(rt)) {}
-
-    // 挂载抖动缓冲解析器
-    void setjtr(JtrResl cb) {
-        // 注册按流名取抖动缓冲的回调
-        jtr_ = std::move(cb);
-    }
     ~StrmEngn() { stpall(); }
 
-    // 启动接收流回放：在指定输出设备上回放该流样本
-    bool strtrx(const DevInf& dev, const std::string& strm, uint32_t ch, uint32_t sr, uint32_t srch = 0) {
+    // 启动接收流回放：按流规格打开输出设备并直写样本
+    bool strtrx(const DevInf& dev, const std::string& strm, const StrmCfg& cfg) {
         // 建立输出音频单元并绑定流回放回调
         if (!rt_) return false;
-        stprx();
+        if (!cfg.ch || !cfg.sr) return false;
 
-        if (openunit(dev.id, ch, false, sr) != noErr) return false;
+        if (rx_run_ && rx_strm_ == strm && rx_cfg_.opeq(cfg)) {
+            return true;
+        }
+
+        stprx();
+        if (openunit(dev.id, cfg, false) != noErr) return false;
 
         rx_strm_ = strm;
-        rx_ch_   = ch ? ch : dev.outchs;
-        rx_srch_ = srch;
+        rx_cfg_  = cfg;
         rx_cb_.inputProc       = &StrmEngn::rxcall;
         rx_cb_.inputProcRefCon = this;
 
@@ -44,7 +52,6 @@ public:
             clsunit(rx_unit_);
             return false;
         }
-
         if (AudioUnitInitialize(rx_unit_) != noErr) {
             clsunit(rx_unit_);
             return false;
@@ -72,16 +79,21 @@ public:
         rx_run_ = false;
     }
 
-    // 启动发送流采集：从指定输入设备采集样本
-    bool strttx(const DevInf& dev, const std::string& strm, uint32_t ch, uint32_t sr) {
+    // 启动发送流采集：按流规格打开输入设备并直读样本
+    bool strttx(const DevInf& dev, const std::string& strm, const StrmCfg& cfg) {
         // 建立输入音频单元并绑定流采集回调
         if (!rt_) return false;
-        stptx();
+        if (!cfg.ch || !cfg.sr) return false;
 
-        if (openunit(dev.id, ch, true, sr) != noErr) return false;
+        if (tx_run_ && tx_strm_ == strm && tx_cfg_.opeq(cfg)) {
+            return true;
+        }
+
+        stptx();
+        if (openunit(dev.id, cfg, true) != noErr) return false;
 
         tx_strm_ = strm;
-        tx_ch_   = ch ? ch : (dev.inchs ? dev.inchs : 1);
+        tx_cfg_  = cfg;
         tx_cb_.inputProc       = &StrmEngn::txcall;
         tx_cb_.inputProcRefCon = this;
 
@@ -90,7 +102,6 @@ public:
             clsunit(tx_unit_);
             return false;
         }
-
         if (AudioUnitInitialize(tx_unit_) != noErr) {
             clsunit(tx_unit_);
             return false;
@@ -133,8 +144,8 @@ public:
 
 private:
     // 打开指定设备的音频单元
-    OSStatus openunit(AudioDeviceID dev_id, uint32_t ch, bool for_in, uint32_t sr) {
-        // 按方向配置 HAL 音频单元与浮点流格式
+    OSStatus openunit(AudioDeviceID dev_id, const StrmCfg& cfg, bool for_in) {
+        // 按流规格配置 HAL 音频单元与浮点流格式
         AudioComponentDescription desc{};
         desc.componentType         = kAudioUnitType_Output;
         desc.componentSubType      = kAudioUnitSubType_HALOutput;
@@ -169,19 +180,19 @@ private:
             return -1;
         }
 
-        // 统一采用 32 位浮点非线性交织格式交换样本
+        // 设备以流自身采样率与声道数打开
         AudioStreamBasicDescription asbd{};
-        asbd.mSampleRate       = sr > 0 ? static_cast<Float64>(sr) : 0;
+        asbd.mSampleRate       = static_cast<Float64>(cfg.sr);
         asbd.mFormatID         = kAudioFormatLinearPCM;
         asbd.mFormatFlags      = kAudioFormatFlagIsFloat | kAudioFormatFlagsNativeEndian | kAudioFormatFlagIsPacked;
         asbd.mBitsPerChannel   = 32;
-        asbd.mChannelsPerFrame = ch ? ch : 2;
+        asbd.mChannelsPerFrame = cfg.ch;
         asbd.mFramesPerPacket  = 1;
-        asbd.mBytesPerFrame    = asbd.mChannelsPerFrame * sizeof(float);
+        asbd.mBytesPerFrame    = cfg.ch * sizeof(float);
         asbd.mBytesPerPacket   = asbd.mBytesPerFrame;
 
         // 向设备侧作用域写入格式
-        const AudioUnitScope scp  = for_in ? kAudioUnitScope_Output : kAudioUnitScope_Input;
+        const AudioUnitScope scp   = for_in ? kAudioUnitScope_Output : kAudioUnitScope_Input;
         const AudioUnitElement elm = for_in ? 1 : 0;
         if (AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat,
                                  scp, elm, &asbd, sizeof(asbd)) != noErr) {
@@ -194,12 +205,6 @@ private:
                              cscp, 0, &asbd, sizeof(asbd));
 
         if (for_in) {
-            // 预取输入侧缓冲参数供实时回调使用
-            UInt32 bsz = sizeof(tx_bmax_);
-            if (AudioUnitGetProperty(unit, kAudioDevicePropertyBufferFrameSize,
-                                     kAudioUnitScope_Global, 0, &tx_bmax_, &bsz) != noErr) {
-                tx_bmax_ = 4096;
-            }
             // 预分配渲染请求描述区，避免实时回调内分配
             abl_.assign(sizeof(AudioBufferList) + sizeof(AudioBuffer), 0);
             tx_unit_ = unit;
@@ -222,21 +227,17 @@ private:
     static OSStatus rxcall(void* ref, AudioUnitRenderActionFlags*,
                            const AudioTimeStamp*, UInt32, UInt32 frames,
                            AudioBufferList* data) {
-        // 从流缓冲提取样本并按设备声道映射输出
+        // 从流缓冲取样本直写输出设备
         auto* self = static_cast<StrmEngn*>(ref);
         if (!self || !data || data->mNumberBuffers == 0) return noErr;
 
         float* dst = static_cast<float*>(data->mBuffers[0].mData);
-        const uint32_t dch = data->mBuffers[0].mNumberChannels ? data->mBuffers[0].mNumberChannels : 1;
-        const size_t dcnt = static_cast<size_t>(frames) * dch;
+        const uint32_t ch = data->mBuffers[0].mNumberChannels ? data->mBuffers[0].mNumberChannels : 1;
+        const size_t cnt = static_cast<size_t>(frames) * ch;
 
-        // 经抗抖动缓冲取数，保证网络抖动与乱序被平滑
-        auto jb = self->jtr_ ? self->jtr_(self->rx_strm_) : nullptr;
-        if (!jb) {
-            std::memset(dst, 0, dcnt * sizeof(float));
-            return noErr;
+        if (self->rx_strm_.empty() || self->rt_->rdrx(self->rx_strm_, dst, cnt) != cnt) {
+            std::memset(dst, 0, cnt * sizeof(float));
         }
-        jb->popblks(dst, dcnt);
         return noErr;
     }
 
@@ -244,18 +245,17 @@ private:
     static OSStatus txcall(void* ref, AudioUnitRenderActionFlags* flags,
                            const AudioTimeStamp* ts, UInt32, UInt32 frames,
                            AudioBufferList*) {
-        // 从输入设备采集样本写入流缓冲
+        // 从输入设备取样本写入流缓冲
         auto* self = static_cast<StrmEngn*>(ref);
         if (!self || !self->tx_unit_ || self->tx_strm_.empty()) return noErr;
 
-        const uint32_t ch = self->tx_ch_ ? self->tx_ch_ : 1;
+        const uint32_t ch = self->tx_cfg_.ch ? self->tx_cfg_.ch : 1;
         const size_t cnt = static_cast<size_t>(frames) * ch;
         if (self->cap_.size() < cnt) {
             self->cap_.resize(cnt, 0.0f);
         }
 
-        // 构造输入总线渲染请求并回填设备样本
-        AudioBufferList* abl = reinterpret_cast<AudioBufferList*>(self->abl_.data());
+        auto* abl = reinterpret_cast<AudioBufferList*>(self->abl_.data());
         abl->mNumberBuffers = 1;
         abl->mBuffers[0].mNumberChannels = ch;
         abl->mBuffers[0].mDataByteSize   = static_cast<UInt32>(cnt * sizeof(float));
@@ -267,23 +267,20 @@ private:
         self->rt_->wrtx(self->tx_strm_, self->cap_.data(), cnt);
         return noErr;
     }
+
     std::shared_ptr<RtEngn> rt_;
-    JtrResl                 jtr_;
     AudioUnit               rx_unit_{nullptr};
     AudioUnit               tx_unit_{nullptr};
     bool                    rx_run_{false};
     bool                    tx_run_{false};
     std::string             rx_strm_;
     std::string             tx_strm_;
-    uint32_t                rx_ch_{2};
-    uint32_t                rx_srch_{0};
-    uint32_t                tx_ch_{1};
+    StrmCfg                 rx_cfg_{};
+    StrmCfg                 tx_cfg_{};
     AURenderCallbackStruct  rx_cb_{};
     AURenderCallbackStruct  tx_cb_{};
     std::vector<float>      cap_;
-    std::vector<float>      rx_tmp_;
-    std::vector<uint8_t>    abl_;       // 输入渲染缓冲描述区
-    uint32_t                tx_bmax_{4096};
+    std::vector<uint8_t>    abl_;
 };
 
 #endif // __APPLE__

@@ -203,10 +203,10 @@
     is_run_.store(true);
     tx_mgr_->strtall();
 
-    // 回放取自各流的抗抖动缓冲
-    auto jtr_src = dmx_;
-    seng_->setjtr([jtr_src](const std::string& strm) {
-        return jtr_src->gtjtr(strm);
+    // 接收样本直送回放缓冲
+    auto rt_ptr = rt_;
+    dmx_->setaudcb([rt_ptr](const char* strm, const float* smpls, size_t cnt, uint32_t) {
+        rt_ptr->wrrx(strm, smpls, cnt);
     });
 
     auto sck_ptr = sck_;
@@ -467,14 +467,12 @@
         inf.outchs = dev.outChannels;
         inf.sr     = dev.sampleRate;
 
-        // 回放采样率与声道数必须取接收流自身规格，否则将发生变调与声道错配
-        const uint32_t sr    = [self rxRateOfStream:strm];
-        const uint32_t srch  = [self rxChanOfStream:strm];
-        inf.sr = sr;
+        // 流规格取自接收流快照，规格未变则引擎内部早退不重配
+        vban::StrmCfg cfg = [self rxcfgOfStream:strm];
+        if (!cfg.ch || !cfg.sr) continue;
 
-        rt_->setrxdev([strm UTF8String], [dev.uid UTF8String], srch, sr);
-        rt_->rstbuf([strm UTF8String], srch, sr);
-        if (seng_->strtrx(inf, [strm UTF8String], dev.outChannels, sr, srch)) {
+        rt_->rstbuf([strm UTF8String], cfg.ch, cfg.sr);
+        if (seng_->strtrx(inf, [strm UTF8String], cfg)) {
             rx_cur_ = strm;
             [rx_active_ addObject:strm];
         }
@@ -510,60 +508,50 @@
         inf.outchs = dev.outChannels;
         inf.sr     = dev.sampleRate;
 
-        // 采集采样率取发送流自身配置速率
-        const uint32_t sr = [self txRateOfStream:strm];
-        inf.sr = sr;
+        // 流规格取自发送流配置，规格未变则引擎内部早退不重配
+        vban::StrmCfg cfg = [self txcfgOfStream:strm];
+        if (!cfg.ch || !cfg.sr) continue;
+        inf.sr = cfg.sr;
 
-        // 采集声道数按发送流规格，保证打包负载与配置一致
-        const uint32_t sch = [self txChanOfStream:strm];
-        rt_->settxdev([strm UTF8String], [dev.uid UTF8String], sch, sr);
-        if (seng_->strttx(inf, [strm UTF8String], sch, sr)) {
+        rt_->settxdev([strm UTF8String], [dev.uid UTF8String], cfg.ch, cfg.sr);
+        if (seng_->strttx(inf, [strm UTF8String], cfg)) {
             tx_cur_ = strm;
             [tx_active_ addObject:strm];
         }
     }
 }
 
-// 查询接收流的采样率
-- (uint32_t)rxRateOfStream:(NSString *)strm {
-    // 从接收流快照中取出该流采样率
+// 查询接收流的完整规格
+- (vban::StrmCfg)rxcfgOfStream:(NSString *)strm {
+    // 从接收流快照中取出声道、采样率与采样格式
+    vban::StrmCfg cfg{};
     auto snap = mtr_->gtsnap(is_run_.load());
     const std::string want = [strm UTF8String];
     for (const auto &s : snap.rx_snaps) {
-        if (want == s.strm && s.sr > 0) return s.sr;
+        if (want == s.strm) {
+            cfg.ch  = s.ch;
+            cfg.sr  = s.sr;
+            cfg.fmt = s.fmt;
+            break;
+        }
     }
-    return 48000;
+    return cfg;
 }
 
-// 查询发送流的声道数
-- (uint32_t)txChanOfStream:(NSString *)strm {
-    // 从发送流配置中取出该流声道数
+// 查询发送流的完整规格
+- (vban::StrmCfg)txcfgOfStream:(NSString *)strm {
+    // 从发送流配置中取出声道、采样率与采样格式
+    vban::StrmCfg cfg{};
     const std::string want = [strm UTF8String];
     for (const auto &s : tx_mgr_->gtsnaps()) {
-        if (want == s.strm && s.ch > 0) return s.ch;
+        if (want == s.strm) {
+            cfg.ch  = s.ch;
+            cfg.sr  = s.sr;
+            cfg.fmt = s.fmt;
+            break;
+        }
     }
-    return 2;
-}
-
-// 查询接收流的声道数
-- (uint32_t)rxChanOfStream:(NSString *)strm {
-    // 从接收流快照中取出该流声道数
-    auto snap = mtr_->gtsnap(is_run_.load());
-    const std::string want = [strm UTF8String];
-    for (const auto &s : snap.rx_snaps) {
-        if (want == s.strm && s.ch > 0) return s.ch;
-    }
-    return 2;
-}
-
-// 查询发送流的采样率
-- (uint32_t)txRateOfStream:(NSString *)strm {
-    // 从发送流配置中取出该流采样率
-    const std::string want = [strm UTF8String];
-    for (const auto &s : tx_mgr_->gtsnaps()) {
-        if (want == s.strm && s.sr > 0) return s.sr;
-    }
-    return 48000;
+    return cfg;
 }
 
 // 按线缆标识检索对应音频设备
