@@ -235,8 +235,7 @@ struct MonitoringView: View {
     // 发送流数据行
     private func txTelemetryRow(idx: Int, tx: VbanTxStreamDesc) -> some View {
         let m = model.metrics.txStreams.first(where: { $0.name == tx.name })
-        let liveKbps = (m?.kbps ?? tx.kbps)
-        let curKbps = tx.enabled ? (liveKbps > 0 ? liveKbps : tx.realKbps) : 0
+        let curKbps = tx.enabled ? (m?.kbps ?? tx.kbps) : 0
         let pps = tx.enabled ? (m?.packetsPerSec ?? tx.packetsPerSec) : 0
 
         return HStack(spacing: 6) {
@@ -283,29 +282,29 @@ struct MonitoringView: View {
                 .foregroundColor(tx.enabled && pps > 0 ? Theme.textSecondary : Theme.textTertiary)
                 .frame(width: 64, alignment: .trailing)
 
-            Text("0")
+            Text("\(m?.lostCount ?? 0)")
                 .font(Theme.monoDigit(11.5, weight: .bold))
-                .foregroundColor(Theme.meterGreen)
+                .foregroundColor((m?.lostCount ?? 0) > 0 ? Theme.alertRed : Theme.meterGreen)
                 .frame(width: 40, alignment: .trailing)
 
-            Text("-")
+            Text("\(m?.orderErrorCount ?? 0)")
                 .font(Theme.monoDigit(11.5, weight: .medium))
-                .foregroundColor(Theme.textTertiary)
+                .foregroundColor((m?.orderErrorCount ?? 0) > 0 ? Theme.amberWarn : Theme.textTertiary)
                 .frame(width: 40, alignment: .trailing)
 
-            Text("-")
+            Text("\(m?.underrunCount ?? 0)")
                 .font(Theme.monoDigit(11.5, weight: .medium))
-                .foregroundColor(Theme.textTertiary)
+                .foregroundColor((m?.underrunCount ?? 0) > 0 ? Theme.alertRed : Theme.textTertiary)
                 .frame(width: 40, alignment: .trailing)
 
-            Text("-")
+            Text("\(m?.overloadCount ?? 0)")
                 .font(Theme.monoDigit(11.5, weight: .medium))
-                .foregroundColor(Theme.textTertiary)
+                .foregroundColor((m?.overloadCount ?? 0) > 0 ? Theme.amberWarn : Theme.textTertiary)
                 .frame(width: 40, alignment: .trailing)
 
-            Text("0")
+            Text("\(m?.corruptCount ?? 0)")
                 .font(Theme.monoDigit(11.5, weight: .medium))
-                .foregroundColor(Theme.textTertiary)
+                .foregroundColor((m?.corruptCount ?? 0) > 0 ? Theme.alertRed : Theme.textTertiary)
                 .frame(width: 40, alignment: .trailing)
 
             Text(String(format: "%.1f ms", m?.jitterMs ?? 0.0))

@@ -88,8 +88,8 @@ struct VbanTxStreamDesc: Identifiable, Codable {
         case id, name, sourceName, targetIp, targetPort, sampleRate, channels, bitDepth, enabled, deviceUid
     }
 
-    // 真实的无压缩 PCM 传输比特率（kbps）
-    var realKbps: UInt32 {
+    // 标称无压缩 PCM 码率（非实测吞吐）
+    var nominalKbps: UInt32 {
         guard enabled else { return 0 }
         return (sampleRate * channels * bitDepth) / 1000
     }

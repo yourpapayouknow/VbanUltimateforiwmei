@@ -184,7 +184,15 @@ private:
                              cscp, 0, &asbd, sizeof(asbd));
 
         if (for_in) {
-            tx_unit_ = unit;
+        // 预取输入侧缓冲参数供实时回调使用
+        UInt32 bsz = sizeof(tx_bmax_);
+        if (AudioUnitGetProperty(unit, kAudioDevicePropertyBufferFrameSize,
+                                 kAudioUnitScope_Global, 0, &tx_bmax_, &bsz) != noErr) {
+            tx_bmax_ = 4096;
+        }
+        // 预分配渲染请求描述区，避免实时回调内分配
+        abl_.assign(sizeof(AudioBufferList) + sizeof(AudioBuffer), 0);
+        tx_unit_ = unit;
         } else {
             rx_unit_ = unit;
         }
@@ -232,13 +240,14 @@ private:
             self->cap_.resize(cnt, 0.0f);
         }
 
-        AudioBufferList abl{};
-        abl.mNumberBuffers = 1;
-        abl.mBuffers[0].mNumberChannels = ch;
-        abl.mBuffers[0].mDataByteSize   = static_cast<UInt32>(cnt * sizeof(float));
-        abl.mBuffers[0].mData           = self->cap_.data();
+        // 构造输入总线渲染请求并回填设备样本
+        AudioBufferList* abl = reinterpret_cast<AudioBufferList*>(self->abl_.data());
+        abl->mNumberBuffers = 1;
+        abl->mBuffers[0].mNumberChannels = ch;
+        abl->mBuffers[0].mDataByteSize   = static_cast<UInt32>(cnt * sizeof(float));
+        abl->mBuffers[0].mData           = self->cap_.data();
 
-        if (AudioUnitRender(self->tx_unit_, flags, ts, 1, frames, &abl) != noErr) {
+        if (AudioUnitRender(self->tx_unit_, flags, ts, 1, frames, abl) != noErr) {
             return noErr;
         }
         self->rt_->wrtx(self->tx_strm_, self->cap_.data(), cnt);
@@ -256,6 +265,8 @@ private:
     AURenderCallbackStruct  rx_cb_{};
     AURenderCallbackStruct  tx_cb_{};
     std::vector<float>      cap_;
+    std::vector<uint8_t>    abl_;       // 输入渲染缓冲描述区
+    uint32_t                tx_bmax_{4096};
 };
 
 #endif // __APPLE__

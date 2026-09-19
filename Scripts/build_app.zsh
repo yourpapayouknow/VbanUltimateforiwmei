@@ -80,11 +80,20 @@ swiftc -O \
     -o "$MACOS_DIR/VBANUltimate"
 
 # 4. 代码签名（携带音频输入权限声明）
-echo "Signing VBAN Ultimate application bundle..."
-codesign --force --deep --sign - \
-    --entitlements "$PROJECT_DIR/Resources/VBANUltimate.entitlements" \
-    "$APP_DIR"
-codesign -dvvv "$APP_DIR" 2>&1 | grep -E "Identifier|Signature|Sealed"
+SIGN_ID="VBAN Ultimate Local Signing"
+if security find-identity -v -p codesigning 2>/dev/null | grep -q "$SIGN_ID"; then
+    echo "Signing VBAN Ultimate application bundle with: $SIGN_ID"
+    codesign --force --deep --sign "$SIGN_ID" \
+        --entitlements "$PROJECT_DIR/Resources/VBANUltimate.entitlements" \
+        "$APP_DIR"
+else
+    echo "WARNING: signing identity '$SIGN_ID' not found, falling back to ad-hoc."
+    echo "         Microphone capture will be silently blocked by TCC."
+    codesign --force --deep --sign - \
+        --entitlements "$PROJECT_DIR/Resources/VBANUltimate.entitlements" \
+        "$APP_DIR"
+fi
+codesign -dvvv "$APP_DIR" 2>&1 | grep -E "Identifier|Authority|Signature|TeamIdentifier"
 
 echo "Application built and signed successfully at: $APP_DIR"
 file "$MACOS_DIR/VBANUltimate"

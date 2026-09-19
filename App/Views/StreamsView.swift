@@ -383,10 +383,9 @@ struct TxStreamCard: View {
                     // 带宽胶囊叠加在横线上（在可用连接段绝对正中心）
                     HStack(spacing: 3) {
                         if tx.enabled {
-                            let dispKbps = tx.kbps > 0 ? tx.kbps : tx.realKbps
-                            Text("\(dispKbps) kbps")
+                            Text("\(tx.kbps) kbps")
                                 .font(Theme.monoDigit(11, weight: .bold))
-                                .foregroundColor(Theme.meterGreen)
+                                .foregroundColor(tx.kbps > 0 ? Theme.meterGreen : Theme.textTertiary)
                             if tx.packetsPerSec > 0 {
                                 Text("(\(tx.packetsPerSec)p/s)")
                                     .font(Theme.monoDigit(10, weight: .semibold))
