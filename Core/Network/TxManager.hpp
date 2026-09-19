@@ -207,21 +207,24 @@ private:
                                           zero_pyld.data(), pyldsz);
 
                     if (pktsz > 0 && sck_) {
-                        sck_->sndsck(s->dst_ip.c_str(), s->dst_prt, pktbuf.data(), pktsz);
+                        ssize_t sent = sck_->sndsck(s->dst_ip.c_str(), s->dst_prt, pktbuf.data(), pktsz);
+                        if (sent < 0) {
+                            s->stats.upderr();
+                        } else {
+                            PktInf inf{};
+                            inf.proto  = ProtoSub::Audio;
+                            inf.sr     = s->sr;
+                            inf.ch     = s->ch;
+                            inf.smpls  = kSmplsPerPkt;
+                            inf.fmt    = s->fmt;
+                            inf.bpsz   = bpsz;
+                            inf.pyldsz = static_cast<uint32_t>(pyldsz);
+                            inf.frmcnt = s->nu_frm;
+                            std::strncpy(inf.strm, s->name.c_str(), kStrmSz);
+                            inf.strm[kStrmSz] = '\0';
 
-                        PktInf inf{};
-                        inf.proto  = ProtoSub::Audio;
-                        inf.sr     = s->sr;
-                        inf.ch     = s->ch;
-                        inf.smpls  = kSmplsPerPkt;
-                        inf.fmt    = s->fmt;
-                        inf.bpsz   = bpsz;
-                        inf.pyldsz = static_cast<uint32_t>(pyldsz);
-                        inf.frmcnt = s->nu_frm;
-                        std::strncpy(inf.strm, s->name.c_str(), kStrmSz);
-                        inf.strm[kStrmSz] = '\0';
-
-                        s->stats.updpkt(inf, s->dst_ip.c_str(), s->dst_prt);
+                            s->stats.updpkt(inf, s->dst_ip.c_str(), s->dst_prt);
+                        }
                     }
 
                     const uint64_t step_us = (uint64_t)kSmplsPerPkt * 1000000ULL / (s->sr > 0 ? s->sr : 48000);

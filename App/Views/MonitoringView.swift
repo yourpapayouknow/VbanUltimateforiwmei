@@ -30,7 +30,7 @@ struct MonitoringView: View {
 
     // 全流是否为空判断
     private var isAllStreamsEmpty: Bool {
-        model.metrics.rxStreams.isEmpty && model.txStreams.filter(\.enabled).isEmpty
+        model.metrics.rxStreams.isEmpty && model.txStreams.isEmpty
     }
 
     // 顶部操作工具条
@@ -143,7 +143,7 @@ struct MonitoringView: View {
                 }
 
                 // 发送流遥测行
-                ForEach(Array(model.txStreams.filter(\.enabled).enumerated()), id: \.element.id) { idx, tx in
+                ForEach(Array(model.txStreams.enumerated()), id: \.element.id) { idx, tx in
                     txTelemetryRow(idx: model.metrics.rxStreams.count + idx, tx: tx)
                     Divider().background(Theme.borderSubtle)
                 }
@@ -234,7 +234,12 @@ struct MonitoringView: View {
 
     // 发送流数据行
     private func txTelemetryRow(idx: Int, tx: VbanTxStreamDesc) -> some View {
-        HStack(spacing: 6) {
+        let m = model.metrics.txStreams.first(where: { $0.name == tx.name })
+        let liveKbps = (m?.kbps ?? tx.kbps)
+        let curKbps = tx.enabled ? (liveKbps > 0 ? liveKbps : tx.realKbps) : 0
+        let pps = tx.enabled ? (m?.packetsPerSec ?? tx.packetsPerSec) : 0
+
+        return HStack(spacing: 6) {
             StatusLed(isActive: tx.enabled)
                 .frame(width: 24, alignment: .center)
 
@@ -268,14 +273,14 @@ struct MonitoringView: View {
 
             Spacer()
 
-            Text("\(fmtKbps(tx.realKbps)) kbps")
+            Text("\(fmtKbps(curKbps)) kbps")
                 .font(Theme.monoDigit(12, weight: .bold))
-                .foregroundColor(Theme.neonCyan)
+                .foregroundColor(tx.enabled && curKbps > 0 ? Theme.neonCyan : Theme.textTertiary)
                 .frame(width: 72, alignment: .trailing)
 
-            Text("\(tx.sampleRate / max(1, model.bufferingFrames)) pkt/s")
+            Text("\(pps) pkt/s")
                 .font(Theme.monoDigit(11.5, weight: .semibold))
-                .foregroundColor(Theme.textSecondary)
+                .foregroundColor(tx.enabled && pps > 0 ? Theme.textSecondary : Theme.textTertiary)
                 .frame(width: 64, alignment: .trailing)
 
             Text("0")
@@ -298,13 +303,13 @@ struct MonitoringView: View {
                 .foregroundColor(Theme.textTertiary)
                 .frame(width: 40, alignment: .trailing)
 
-            Text("-")
+            Text("0")
                 .font(Theme.monoDigit(11.5, weight: .medium))
                 .foregroundColor(Theme.textTertiary)
                 .frame(width: 40, alignment: .trailing)
 
-            Text("-")
-                .font(Theme.monoDigit(11.5, weight: .medium))
+            Text(String(format: "%.1f ms", m?.jitterMs ?? 0.0))
+                .font(Theme.monoDigit(11.5, weight: .semibold))
                 .foregroundColor(Theme.textTertiary)
                 .frame(width: 56, alignment: .trailing)
         }
