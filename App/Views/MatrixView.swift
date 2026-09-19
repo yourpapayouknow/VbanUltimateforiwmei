@@ -6,16 +6,6 @@ enum MatrixViewMode: String, CaseIterable {
     case matrix
 }
 
-// 矩阵槽位端点描述
-struct MatrixSlot: Identifiable, Equatable {
-    var id: String
-    var endpointId: String
-    var name: String
-    var typeDesc: String
-    var iconName: String
-    var kind: UInt8 = 0
-}
-
 struct MatrixView: View {
     @ObservedObject var model: AppModel
 
@@ -284,41 +274,11 @@ struct MatrixCanvasView: View {
     let dashedSlotThickness: CGFloat = 48
     let dashedInnerThickness: CGFloat = 44
 
-    // 矩阵输入行：物理输入、线缆输出端、网络接收流
-    private var inputSlots: [MatrixSlot] {
-        var ins: [MatrixSlot] = []
-        for dev in model.devices where dev.inChannels > 0 {
-            ins.append(MatrixSlot(id: "dev_in_\(dev.uid)", endpointId: dev.uid, name: dev.name,
-                                  typeDesc: model.t("物理输入", "Device In"), iconName: "mic.fill", kind: 0))
-        }
-        for cable in model.cables {
-            ins.append(MatrixSlot(id: "cable_out_\(cable.cableId)", endpointId: cable.cableId, name: cable.name,
-                                  typeDesc: model.t("线缆输出", "Cable Out"), iconName: "cable.connector", kind: 1))
-        }
-        for s in model.metrics.rxStreams {
-            ins.append(MatrixSlot(id: "rx_\(s.name)", endpointId: s.name, name: "VBAN [\(s.name)]",
-                                  typeDesc: model.t("网络流", "VBAN RX"), iconName: "waveform", kind: 2))
-        }
-        return ins
-    }
+    // 矩阵输入行槽位
+    private var inputSlots: [MatrixSlot] { model.inSlots }
 
-    // 矩阵输出列：物理输出、线缆输入端、网络发送流
-    private var outputSlots: [MatrixSlot] {
-        var outs: [MatrixSlot] = []
-        for dev in model.devices where dev.outChannels > 0 {
-            outs.append(MatrixSlot(id: "dev_out_\(dev.uid)", endpointId: dev.uid, name: dev.name,
-                                   typeDesc: model.t("物理输出", "Device Out"), iconName: "speaker.wave.2.fill", kind: 0))
-        }
-        for cable in model.cables {
-            outs.append(MatrixSlot(id: "cable_in_\(cable.cableId)", endpointId: cable.cableId, name: cable.name,
-                                   typeDesc: model.t("线缆输入", "Cable In"), iconName: "cable.connector", kind: 1))
-        }
-        for tx in model.txStreams {
-            outs.append(MatrixSlot(id: "tx_\(tx.name)", endpointId: tx.name, name: "VBAN [\(tx.name)]",
-                                   typeDesc: model.t("网络流", "VBAN TX"), iconName: "waveform", kind: 2))
-        }
-        return outs
-    }
+    // 矩阵输出列槽位
+    private var outputSlots: [MatrixSlot] { model.outSlots }
 
     var body: some View {
         ScrollView([.horizontal, .vertical], showsIndicators: true) {
@@ -350,7 +310,9 @@ struct MatrixCanvasView: View {
                         model: model,
                         width: cellInnerSize,
                         height: cellInnerSize,
-                        onSelectEndpoint: { _, _, _ in },
+                        onSelectEndpoint: { newId, newName, newType in
+                            model.setOutSlot(id: outSlot.id, endpointId: newId, name: newName, typeDesc: newType)
+                        },
                     )
                     .frame(width: cellSlotSize, height: cellSlotSize)
                 }
@@ -359,9 +321,9 @@ struct MatrixCanvasView: View {
                     width: dashedInnerThickness,
                     height: cellInnerSize,
                     label: "+",
-                    tooltip: model.t("新建路由规则", "Add Route")
+                    tooltip: model.t("添加输出通道", "Add output channel")
                 ) {
-                    onOpenAddSheet()
+                    model.addOutSlot()
                 }
                 .frame(width: dashedSlotThickness, height: cellSlotSize)
             }
@@ -375,7 +337,9 @@ struct MatrixCanvasView: View {
                         model: model,
                         width: inInnerWidth,
                         height: cellInnerSize,
-                        onSelectEndpoint: { _, _, _ in },
+                        onSelectEndpoint: { newId, newName, newType in
+                            model.setInSlot(id: inSlot.id, endpointId: newId, name: newName, typeDesc: newType)
+                        },
                     )
                     .frame(width: inSlotWidth, height: cellSlotSize)
 
@@ -408,9 +372,9 @@ struct MatrixCanvasView: View {
                     width: inInnerWidth,
                     height: dashedInnerThickness,
                     label: "+",
-                    tooltip: model.t("新建路由规则", "Add Route")
+                    tooltip: model.t("添加输入通道", "Add input channel")
                 ) {
-                    onOpenAddSheet()
+                    model.addInSlot()
                 }
                 .frame(width: inSlotWidth, height: dashedSlotThickness)
 
@@ -419,9 +383,9 @@ struct MatrixCanvasView: View {
                         width: cellInnerSize,
                         height: dashedInnerThickness,
                         label: "+",
-                        tooltip: model.t("新建路由规则", "Add Route")
+                        tooltip: model.t("添加输入通道", "Add input channel")
                     ) {
-                        onOpenAddSheet()
+                        model.addInSlot()
                     }
                     .frame(width: cellSlotSize, height: dashedSlotThickness)
                 }

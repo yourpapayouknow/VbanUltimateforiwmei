@@ -94,6 +94,16 @@ struct VbanTxStreamDesc: Identifiable, Codable {
     }
 }
 
+// 矩阵槽位端点描述
+struct MatrixSlot: Identifiable, Equatable, Codable {
+    var id: String
+    var endpointId: String
+    var name: String
+    var typeDesc: String
+    var iconName: String
+    var kind: UInt8
+}
+
 // 网络质量预设枚举
 enum VbanNetworkQuality: UInt8, CaseIterable, Identifiable {
     case optimal = 0
@@ -165,6 +175,14 @@ final class AppModel: ObservableObject {
     @Published var cables: [VbanCableDesc] = []
     @Published var devices: [VbanAudioDevDesc] = []
     @Published var routes: [VbanRouteDesc] = []
+
+    // 矩阵输入行与输出列槽位
+    @Published var inSlots: [MatrixSlot] = [] {
+        didSet { saveSlots() }
+    }
+    @Published var outSlots: [MatrixSlot] = [] {
+        didSet { saveSlots() }
+    }
     @Published var txStreams: [VbanTxStreamDesc] = [] {
         didSet {
             saveTxStreams()
@@ -301,6 +319,7 @@ final class AppModel: ObservableObject {
         bridge.setNetworkQuality(networkQuality.rawValue)
         bridge.setBufferingFrames(bufferingFrames)
         loadTxStreams()
+        loadSlots()
         applyThemeStyle(themeStyle)
         DistributedNotificationCenter.default().addObserver(
             self,
@@ -513,6 +532,126 @@ final class AppModel: ObservableObject {
             routes = bridge.getRoutes()
             devices = bridge.getDevices()
         }
+    }
+
+    // 矩阵槽位管理
+    private func loadSlots() {
+        // 载入矩阵槽位，缺省时建立 2x2 空矩阵
+        let dec = JSONDecoder()
+        if let d = UserDefaults.standard.data(forKey: "vban_matrix_in"),
+           let list = try? dec.decode([MatrixSlot].self, from: d), !list.isEmpty {
+            inSlots = list
+        } else {
+            inSlots = Self.blnkslts("in", 2)
+        }
+        if let d = UserDefaults.standard.data(forKey: "vban_matrix_out"),
+           let list = try? dec.decode([MatrixSlot].self, from: d), !list.isEmpty {
+            outSlots = list
+        } else {
+            outSlots = Self.blnkslts("out", 2)
+        }
+    }
+
+    // 建立指定数量的空槽位
+    static func blnkslts(_ pfx: String, _ cnt: Int) -> [MatrixSlot] {
+        // 生成未配置端点的占位槽位
+        (1...max(1, cnt)).map { i in
+            MatrixSlot(id: "\(pfx)_\(UUID().uuidString.prefix(6))", endpointId: "",
+                       name: "", typeDesc: "", iconName: "", kind: 0)
+        }
+    }
+
+    private func saveSlots() {
+        // 持久化矩阵槽位排布
+        let enc = JSONEncoder()
+        if let d = try? enc.encode(inSlots) {
+            UserDefaults.standard.set(d, forKey: "vban_matrix_in")
+        }
+        if let d = try? enc.encode(outSlots) {
+            UserDefaults.standard.set(d, forKey: "vban_matrix_out")
+        }
+    }
+
+    // 追加输入行
+    func addInSlot() {
+        inSlots.append(contentsOf: Self.blnkslts("in", 1))
+    }
+
+    // 追加输出列
+    func addOutSlot() {
+        outSlots.append(contentsOf: Self.blnkslts("out", 1))
+    }
+
+    // 删除输入行并级联清理相关路由
+    func removeInSlot(id: String) {
+        guard let idx = inSlots.firstIndex(where: { $0.id == id }) else { return }
+        let ep = inSlots[idx].endpointId
+        if !ep.isEmpty {
+            for r in routes where r.srcId == ep {
+                _ = bridge.removeRoute(withId: r.routeId)
+            }
+        }
+        inSlots.remove(at: idx)
+        bridge.syncRoutes()
+        routes = bridge.getRoutes()
+    }
+
+    // 删除输出列并级联清理相关路由
+    func removeOutSlot(id: String) {
+        guard let idx = outSlots.firstIndex(where: { $0.id == id }) else { return }
+        let ep = outSlots[idx].endpointId
+        if !ep.isEmpty {
+            for r in routes where r.dstId == ep {
+                _ = bridge.removeRoute(withId: r.routeId)
+            }
+        }
+        outSlots.remove(at: idx)
+        bridge.syncRoutes()
+        routes = bridge.getRoutes()
+    }
+
+    // 填入输入行端点
+    func setInSlot(id: String, endpointId: String, name: String, typeDesc: String) {
+        // 更新输入槽位端点并清理其失效路由
+        guard let idx = inSlots.firstIndex(where: { $0.id == id }) else { return }
+        let old = inSlots[idx].endpointId
+        if !old.isEmpty && old != endpointId {
+            for r in routes where r.srcId == old {
+                _ = bridge.removeRoute(withId: r.routeId)
+            }
+        }
+        inSlots[idx].endpointId = endpointId
+        inSlots[idx].name = name
+        inSlots[idx].typeDesc = typeDesc
+        inSlots[idx].kind = kndof(typeDesc)
+        bridge.syncRoutes()
+        routes = bridge.getRoutes()
+    }
+
+    // 填入输出列端点
+    func setOutSlot(id: String, endpointId: String, name: String, typeDesc: String) {
+        // 更新输出槽位端点并清理其失效路由
+        guard let idx = outSlots.firstIndex(where: { $0.id == id }) else { return }
+        let old = outSlots[idx].endpointId
+        if !old.isEmpty && old != endpointId {
+            for r in routes where r.dstId == old {
+                _ = bridge.removeRoute(withId: r.routeId)
+            }
+        }
+        outSlots[idx].endpointId = endpointId
+        outSlots[idx].name = name
+        outSlots[idx].typeDesc = typeDesc
+        outSlots[idx].kind = kndof(typeDesc)
+        bridge.syncRoutes()
+        routes = bridge.getRoutes()
+    }
+
+    // 依据端点说明判定端点类型
+    private func kndof(_ typeDesc: String) -> UInt8 {
+        // 线缆为一类，网络流为二类，其余归物理端点
+        if typeDesc.contains("线缆") || typeDesc.contains("Cable") { return 1 }
+        if typeDesc.contains("网络") || typeDesc.contains("VBAN") { return 2 }
+        return 0
     }
 
     // 矩阵路由操作
