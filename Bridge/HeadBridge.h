@@ -137,7 +137,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 // 矩阵路由管理
 - (NSArray<VbanRouteDesc *> *)getRoutes;
-- (BOOL)addRouteWithId:(NSString *)rId srcId:(NSString *)sId srcName:(NSString *)sName dstId:(NSString *)dId dstName:(NSString *)dName gain:(float)gain;
+- (BOOL)addRouteWithId:(NSString *)rId srcKind:(uint8_t)sKind srcId:(NSString *)sId srcName:(NSString *)sName dstKind:(uint8_t)dKind dstId:(NSString *)dId dstName:(NSString *)dName gain:(float)gain;
 - (BOOL)removeRouteWithId:(NSString *)rId;
 - (void)toggleRouteWithId:(NSString *)rId enabled:(BOOL)en;
 
@@ -147,12 +147,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)setTxStreamEnabled:(NSString *)sId enabled:(BOOL)en;
 - (void)clearTxStreams;
 
-// 流设备指派：为每条流绑定独占的输入或输出设备
-- (BOOL)assignRxStream:(NSString *)strm toDevice:(NSString *)devUid channels:(uint32_t)ch sampleRate:(uint32_t)sr;
-- (BOOL)assignTxStream:(NSString *)strm toDevice:(NSString *)devUid channels:(uint32_t)ch sampleRate:(uint32_t)sr;
-- (void)clearRxAssign:(NSString *)strm;
-- (nullable NSString *)rxDeviceOfStream:(NSString *)strm;
-- (nullable NSString *)txDeviceOfStream:(NSString *)strm;
+// 流设备指派：依据矩阵规则同步流与设备的音频通路
+- (void)syncRoutes;
 
 // 全局指标快照 (500ms 轮询)
 - (VbanAppMetric *)getSnapshot;

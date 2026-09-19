@@ -13,6 +13,7 @@ struct MatrixSlot: Identifiable, Equatable {
     var name: String
     var typeDesc: String
     var iconName: String
+    var kind: UInt8 = 0
 }
 
 struct MatrixView: View {
@@ -144,24 +145,24 @@ struct MatrixView: View {
     private func initSlots() {
         var availableInputs: [MatrixSlot] = []
         for dev in model.devices.filter({ $0.inChannels > 0 }) {
-            availableInputs.append(MatrixSlot(id: "dev_in_\(dev.uid)", endpointId: dev.uid, name: dev.name, typeDesc: model.t("物理输入", "Device In"), iconName: "mic.fill"))
+            availableInputs.append(MatrixSlot(id: "dev_in_\(dev.uid)", endpointId: dev.uid, name: dev.name, typeDesc: model.t("物理输入", "Device In"), iconName: "mic.fill", kind: 0))
         }
         for cable in model.cables {
-            availableInputs.append(MatrixSlot(id: "cable_out_\(cable.cableId)", endpointId: cable.cableId, name: cable.name, typeDesc: model.t("线缆输出", "Cable Out"), iconName: "cable.connector"))
+            availableInputs.append(MatrixSlot(id: "cable_out_\(cable.cableId)", endpointId: cable.cableId, name: cable.name, typeDesc: model.t("线缆输出", "Cable Out"), iconName: "cable.connector", kind: 1))
         }
         for s in model.metrics.rxStreams {
-            availableInputs.append(MatrixSlot(id: "rx_\(s.name)", endpointId: s.name, name: "VBAN [\(s.name)]", typeDesc: model.t("网络流", "VBAN RX"), iconName: "waveform"))
+            availableInputs.append(MatrixSlot(id: "rx_\(s.name)", endpointId: s.name, name: "VBAN [\(s.name)]", typeDesc: model.t("网络流", "VBAN RX"), iconName: "waveform", kind: 2))
         }
 
         var availableOutputs: [MatrixSlot] = []
         for dev in model.devices.filter({ $0.outChannels > 0 }) {
-            availableOutputs.append(MatrixSlot(id: "dev_out_\(dev.uid)", endpointId: dev.uid, name: dev.name, typeDesc: model.t("物理输出", "Device Out"), iconName: "speaker.wave.2.fill"))
+            availableOutputs.append(MatrixSlot(id: "dev_out_\(dev.uid)", endpointId: dev.uid, name: dev.name, typeDesc: model.t("物理输出", "Device Out"), iconName: "speaker.wave.2.fill", kind: 0))
         }
         for cable in model.cables {
-            availableOutputs.append(MatrixSlot(id: "cable_in_\(cable.cableId)", endpointId: cable.cableId, name: cable.name, typeDesc: model.t("线缆输入", "Cable In"), iconName: "cable.connector"))
+            availableOutputs.append(MatrixSlot(id: "cable_in_\(cable.cableId)", endpointId: cable.cableId, name: cable.name, typeDesc: model.t("线缆输入", "Cable In"), iconName: "cable.connector", kind: 1))
         }
         for tx in model.txStreams {
-            availableOutputs.append(MatrixSlot(id: "tx_\(tx.name)", endpointId: tx.name, name: "VBAN [\(tx.name)]", typeDesc: model.t("网络流", "VBAN TX"), iconName: "waveform"))
+            availableOutputs.append(MatrixSlot(id: "tx_\(tx.name)", endpointId: tx.name, name: "VBAN [\(tx.name)]", typeDesc: model.t("网络流", "VBAN TX"), iconName: "waveform", kind: 2))
         }
 
         var ins = Array(availableInputs.prefix(4))
@@ -856,8 +857,10 @@ struct CrossPointCell: View {
                 model.addRoute(
                     srcId: inSlot.endpointId,
                     srcName: inSlot.name,
+                    srcKind: inSlot.kind,
                     dstId: outSlot.endpointId,
                     dstName: outSlot.name,
+                    dstKind: outSlot.kind,
                     gain: 1.0
                 )
             } else {
@@ -901,6 +904,8 @@ struct AddRouteSheet: View {
     @State private var dstId: String = ""
     @State private var dstName: String = ""
     @State private var gain: Float = 1.0
+    @State private var srcKind: UInt8 = 0
+    @State private var dstKind: UInt8 = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -925,6 +930,7 @@ struct AddRouteSheet: View {
                 } else if let c = model.cables.first {
                     srcId = c.cableId
                     srcName = c.name
+                    srcKind = 1
                 }
             }
             if dstId.isEmpty {
@@ -934,9 +940,11 @@ struct AddRouteSheet: View {
                 } else if let c = model.cables.first {
                     dstId = c.cableId
                     dstName = c.name
+                    dstKind = 1
                 } else if let tx = model.txStreams.first {
                     dstId = tx.name
                     dstName = "VBAN [\(tx.name)]"
+                    dstKind = 2
                 }
             }
         }
@@ -973,6 +981,7 @@ struct AddRouteSheet: View {
                         Button(d.name) {
                             srcId = d.uid
                             srcName = d.name
+                            srcKind = 0
                         }
                     }
                 }
@@ -981,6 +990,7 @@ struct AddRouteSheet: View {
                         Button(c.name) {
                             srcId = c.cableId
                             srcName = c.name
+                            srcKind = 1
                         }
                     }
                 }
@@ -989,6 +999,7 @@ struct AddRouteSheet: View {
                         Button(s.name) {
                             srcId = s.name
                             srcName = "VBAN [\(s.name)]"
+                            srcKind = 2
                         }
                     }
                 }
@@ -1015,6 +1026,7 @@ struct AddRouteSheet: View {
                         Button(d.name) {
                             dstId = d.uid
                             dstName = d.name
+                            dstKind = 0
                         }
                     }
                 }
@@ -1023,6 +1035,7 @@ struct AddRouteSheet: View {
                         Button(c.name) {
                             dstId = c.cableId
                             dstName = c.name
+                            dstKind = 1
                         }
                     }
                 }
@@ -1031,6 +1044,7 @@ struct AddRouteSheet: View {
                         Button(tx.name) {
                             dstId = tx.name
                             dstName = "VBAN [\(tx.name)]"
+                            dstKind = 2
                         }
                     }
                 }
@@ -1080,7 +1094,7 @@ struct AddRouteSheet: View {
                 if let existing = model.routes.first(where: { $0.dstId == dstId }) {
                     model.removeRoute(id: existing.routeId)
                 }
-                model.addRoute(srcId: srcId, srcName: srcName, dstId: dstId, dstName: dstName, gain: gain)
+                model.addRoute(srcId: srcId, srcName: srcName, srcKind: srcKind, dstId: dstId, dstName: dstName, dstKind: dstKind, gain: gain)
                 isPresented = false
             }) {
                 Text(model.t("创建并连接", "Create & Connect"))

@@ -57,7 +57,21 @@
     std::atomic<uint16_t>             bound_port_;
     std::atomic<uint8_t>              net_qlt_;
     std::atomic<uint32_t>             buffering_frames_;
+    NSMutableSet<NSString *>         *rx_active_;
+    NSMutableSet<NSString *>         *tx_active_;
+    NSString                         *rx_cur_;
+    NSString                         *tx_cur_;
 }
+
+// 应用接收流回放设备绑定
+- (void)hndlrx:(NSDictionary<NSString *, NSString *> *)map;
+
+// 应用发送流采集设备绑定
+- (void)hndltx:(NSDictionary<NSString *, NSString *> *)map;
+
+// 按线缆标识检索对应音频设备
+- (nullable VbanAudioDevDesc *)devByCableId:(NSString *)cableId;
+
 @end
 
 @implementation VbanBridge
@@ -91,6 +105,8 @@
         bound_port_       = 6980;
         net_qlt_          = 1;
         buffering_frames_ = 128;
+        rx_active_        = [NSMutableSet set];
+        tx_active_        = [NSMutableSet set];
     }
     return self;
 }
@@ -354,10 +370,10 @@
     return arr;
 }
 
-- (BOOL)addRouteWithId:(NSString *)rId srcId:(NSString *)sId srcName:(NSString *)sName dstId:(NSString *)dId dstName:(NSString *)dName gain:(float)gain {
-    // 添加或更新矩阵规则
-    vban::Endpnt src{vban::EndpntTyp::Physical, [sId UTF8String], [sName UTF8String]};
-    vban::Endpnt dst{vban::EndpntTyp::Physical, [dId UTF8String], [dName UTF8String]};
+- (BOOL)addRouteWithId:(NSString *)rId srcKind:(uint8_t)sKind srcId:(NSString *)sId srcName:(NSString *)sName dstKind:(uint8_t)dKind dstId:(NSString *)dId dstName:(NSString *)dName gain:(float)gain {
+    // 添加或更新矩阵规则并保留端点类型
+    vban::Endpnt src{static_cast<vban::EndpntTyp>(sKind), [sId UTF8String], [sName UTF8String]};
+    vban::Endpnt dst{static_cast<vban::EndpntTyp>(dKind), [dId UTF8String], [dName UTF8String]};
     return rtr_->addrout([rId UTF8String], src, dst, gain);
 }
 
@@ -391,93 +407,123 @@
     tx_mgr_->clrstrms();
 }
 
-// 按设备标识检索音频设备
-- (nullable VbanAudioDevDesc *)findDeviceByUid:(NSString *)uid {
-    // 在已枚举设备中匹配唯一标识
-    if (!uid || uid.length == 0) return nil;
-    for (VbanAudioDevDesc *d in [self getDevices]) {
-        if ([d.uid isEqualToString:uid]) return d;
+// 依据矩阵规则同步全部流的设备绑定
+- (void)syncRoutes {
+    // 将矩阵交叉点翻译为流与设备之间的音频通路
+    auto rts = rtr_->gtrouts();
+
+    // 接收流送往线缆输出端回放
+    NSMutableDictionary<NSString *, NSString *> *rxDev = [NSMutableDictionary dictionary];
+    // 线缆输入端采集送往发送流
+    NSMutableDictionary<NSString *, NSString *> *txDev = [NSMutableDictionary dictionary];
+
+    for (const auto &r : rts) {
+        if (!r.en) continue;
+        const auto &sid = r.src.id;
+        const auto &did = r.dst.id;
+
+        // 网络接收流到虚拟线缆
+        if (r.src.typ == vban::EndpntTyp::Vban && r.dst.typ == vban::EndpntTyp::Cable) {
+            rxDev[[NSString stringWithUTF8String:sid.c_str()]] =
+                [NSString stringWithUTF8String:did.c_str()];
+        }
+        // 虚拟线缆到网络发送流
+        if (r.src.typ == vban::EndpntTyp::Cable && r.dst.typ == vban::EndpntTyp::Vban) {
+            txDev[[NSString stringWithUTF8String:did.c_str()]] =
+                [NSString stringWithUTF8String:sid.c_str()];
+        }
+    }
+
+    [self hndlrx:rxDev];
+    [self hndltx:txDev];
+}
+
+// 应用接收流回放设备绑定
+- (void)hndlrx:(NSDictionary<NSString *, NSString *> *)map {
+    // 停止已解除绑定的接收流并启动新增绑定
+    for (NSString *key in rx_active_) {
+        if (map[key] == nil) {
+            seng_->stprx();
+            rt_->clrrxdev([key UTF8String]);
+        }
+    }
+    [rx_active_ removeAllObjects];
+
+    for (NSString *strm in map) {
+        NSString *devUid = map[strm];
+        VbanAudioDevDesc *dev = [self devByCableId:devUid];
+        if (!dev || dev.outChannels == 0) continue;
+
+        if (seng_->gtrxrun() && rx_cur_ && [rx_cur_ isEqualToString:strm]) {
+            [rx_active_ addObject:strm];
+            continue;
+        }
+
+        vban::DevInf inf{};
+        inf.id     = dev.devId;
+        inf.uid    = [dev.uid UTF8String];
+        inf.name   = [dev.name UTF8String];
+        inf.inchs  = dev.inChannels;
+        inf.outchs = dev.outChannels;
+        inf.sr     = dev.sampleRate;
+
+        rt_->setrxdev([strm UTF8String], [dev.uid UTF8String], dev.outChannels, 48000);
+        rt_->rstbuf([strm UTF8String], dev.outChannels, 48000);
+        if (seng_->strtrx(inf, [strm UTF8String], dev.outChannels)) {
+            rx_cur_ = strm;
+            [rx_active_ addObject:strm];
+        }
+    }
+}
+
+// 应用发送流采集设备绑定
+- (void)hndltx:(NSDictionary<NSString *, NSString *> *)map {
+    // 停止已解除绑定的发送流并启动新增绑定
+    for (NSString *key in tx_active_) {
+        if (map[key] == nil) {
+            seng_->stptx();
+            rt_->settxdev([key UTF8String], "", 0, 0);
+        }
+    }
+    [tx_active_ removeAllObjects];
+
+    for (NSString *strm in map) {
+        NSString *cableId = map[strm];
+        VbanAudioDevDesc *dev = [self devByCableId:cableId];
+        if (!dev || dev.inChannels == 0) continue;
+
+        if (seng_->gttxrun() && tx_cur_ && [tx_cur_ isEqualToString:strm]) {
+            [tx_active_ addObject:strm];
+            continue;
+        }
+
+        vban::DevInf inf{};
+        inf.id     = dev.devId;
+        inf.uid    = [dev.uid UTF8String];
+        inf.name   = [dev.name UTF8String];
+        inf.inchs  = dev.inChannels;
+        inf.outchs = dev.outChannels;
+        inf.sr     = dev.sampleRate;
+
+        rt_->settxdev([strm UTF8String], [dev.uid UTF8String], dev.inChannels, 48000);
+        if (seng_->strttx(inf, [strm UTF8String], dev.inChannels)) {
+            tx_cur_ = strm;
+            [tx_active_ addObject:strm];
+        }
+    }
+}
+
+// 按线缆标识检索对应音频设备
+- (nullable VbanAudioDevDesc *)devByCableId:(NSString *)cableId {
+    // 在虚拟线缆列表中匹配标识并取同名系统设备
+    for (VbanCableDesc *c in [self getCables]) {
+        if ([c.cableId isEqualToString:cableId]) {
+            for (VbanAudioDevDesc *d in [self getDevices]) {
+                if ([d.name isEqualToString:c.name]) return d;
+            }
+        }
     }
     return nil;
-}
-
-// 将接收流回放指派到指定输出设备
-- (BOOL)assignRxStream:(NSString *)strm toDevice:(NSString *)devUid channels:(uint32_t)ch sampleRate:(uint32_t)sr {
-    // 绑定接收流并启动其回放通路
-    if (!strm || strm.length == 0) return NO;
-
-    seng_->stprx();
-    [self clearRxAssign:strm];
-
-    if (!devUid || devUid.length == 0) return YES;
-
-    VbanAudioDevDesc *desc = [self findDeviceByUid:devUid];
-    if (!desc || desc.outChannels == 0) return NO;
-
-    vban::DevInf inf{};
-    inf.id     = desc.devId;
-    inf.uid    = [devUid UTF8String];
-    inf.name   = [desc.name UTF8String];
-    inf.inchs  = desc.inChannels;
-    inf.outchs = desc.outChannels;
-    inf.sr     = desc.sampleRate;
-
-    const uint32_t use_ch = ch ? ch : desc.outChannels;
-    rt_->setrxdev([strm UTF8String], [devUid UTF8String], use_ch, sr ? sr : 48000);
-    rt_->rstbuf([strm UTF8String], use_ch, sr ? sr : 48000);
-    return seng_->strtrx(inf, [strm UTF8String], use_ch) ? YES : NO;
-}
-
-// 将发送流采集指派到指定输入设备
-- (BOOL)assignTxStream:(NSString *)strm toDevice:(NSString *)devUid channels:(uint32_t)ch sampleRate:(uint32_t)sr {
-    // 绑定发送流并启动其采集通路
-    if (!strm || strm.length == 0) return NO;
-
-    seng_->stptx();
-
-    if (!devUid || devUid.length == 0) {
-        rt_->settxdev([strm UTF8String], "", 0, 0);
-        return YES;
-    }
-
-    VbanAudioDevDesc *desc = [self findDeviceByUid:devUid];
-    if (!desc || desc.inChannels == 0) return NO;
-
-    vban::DevInf inf{};
-    inf.id     = desc.devId;
-    inf.uid    = [devUid UTF8String];
-    inf.name   = [desc.name UTF8String];
-    inf.inchs  = desc.inChannels;
-    inf.outchs = desc.outChannels;
-    inf.sr     = desc.sampleRate;
-
-    const uint32_t use_ch = ch ? ch : (desc.inChannels ? desc.inChannels : 1);
-    rt_->settxdev([strm UTF8String], [devUid UTF8String], use_ch, sr ? sr : 48000);
-    return seng_->strttx(inf, [strm UTF8String], use_ch) ? YES : NO;
-}
-
-// 解除接收流的设备指派
-- (void)clearRxAssign:(NSString *)strm {
-    // 停止回放并清除绑定记录
-    if (!strm || strm.length == 0) return;
-    seng_->stprx();
-    rt_->clrrxdev([strm UTF8String]);
-}
-
-// 查询接收流已指派设备
-- (nullable NSString *)rxDeviceOfStream:(NSString *)strm {
-    // 返回接收流绑定的输出设备标识
-    if (!strm || strm.length == 0) return nil;
-    const std::string uid = rt_->gtrxdev([strm UTF8String]);
-    return uid.empty() ? nil : [NSString stringWithUTF8String:uid.c_str()];
-}
-
-// 查询发送流已指派设备
-- (nullable NSString *)txDeviceOfStream:(NSString *)strm {
-    // 返回发送流绑定的输入设备标识
-    if (!strm || strm.length == 0) return nil;
-    const std::string uid = rt_->gttxdev([strm UTF8String]);
-    return uid.empty() ? nil : [NSString stringWithUTF8String:uid.c_str()];
 }
 
 - (VbanAppMetric *)getSnapshot {
