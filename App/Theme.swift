@@ -84,10 +84,10 @@ enum Theme {
         light: NSColor(white: 0.0, alpha: 0.12)
     ))
 
-    // 专业音频强调色 (动态适配深浅模式，保证浅色底对比度 > 4.5:1)
+    // 专业音频强调色 (深色电光青 / 浅色图标品牌橙)
     static let neonCyan = Color(nsColor: .dynamic(
         dark: NSColor(red: 0.00, green: 0.88, blue: 0.95, alpha: 1.0),   // 电光青
-        light: NSColor(red: 0.00, green: 0.48, blue: 0.55, alpha: 1.0)   // 深青
+        light: NSColor(red: 0.93, green: 0.44, blue: 0.04, alpha: 1.0)   // 图标品牌活力橙 (#ED700A)
     ))
 
     static let meterGreen = Color(nsColor: .dynamic(
