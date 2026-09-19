@@ -109,7 +109,7 @@ graph TD
 ## 系统要求
 
 - 操作系统：macOS 13.0 或更高版本。
-- 硬件架构：Apple Silicon 芯片，包含 M1、M2、M3、M4 全系列。
+- 硬件架构：Apple Silicon M1 及以上芯片。
 - 开发工具：Xcode 命令行工具，包含编译器 clang++ 与 swiftc。
 
 ---

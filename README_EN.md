@@ -109,7 +109,7 @@ graph TD
 ## System Requirements
 
 - Operating System: macOS 13.0 or later, including macOS 14 Sonoma and macOS 15 Sequoia.
-- Hardware Architecture: Apple Silicon chips across all M1, M2, M3, and M4 generations.
+- Hardware Architecture: Apple Silicon M1 or later.
 - Toolchain: Xcode Command Line Tools providing compilers clang++ and swiftc.
 
 ---
