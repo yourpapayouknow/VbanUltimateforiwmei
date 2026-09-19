@@ -31,11 +31,6 @@ struct MonitoringView: View {
     // 顶部操作工具条
     private var topToolbar: some View {
         HStack(spacing: 8) {
-            Text(model.t("监控诊断", "Monitoring & Diagnostics"))
-                .font(Theme.cnText(16.5, weight: .bold))
-                .foregroundColor(Theme.textPrimary)
-                .help(model.t("实时遥测各音频流网络吞吐、微秒抖动、丢包与时钟漂移", "Real-time telemetry of network throughput, jitter, loss, and clock drift"))
-
             Spacer()
 
             ParamCapsule(
@@ -135,8 +130,8 @@ struct MonitoringView: View {
             StatusLed(isActive: strm.status == "Active")
                 .frame(width: 26, alignment: .center)
 
-            Text(model.t("接收", "RX"))
-                .font(Theme.cnText(10.5, weight: .bold))
+            Text("RX")
+                .font(Theme.monoDigit(10.5, weight: .bold))
                 .foregroundColor(Theme.neonCyan)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 1.5)
@@ -153,10 +148,7 @@ struct MonitoringView: View {
                 .lineLimit(1)
                 .frame(width: 130, alignment: .leading)
 
-            Text("\(strm.sampleRate / 1000)kHz · \(strm.channels)CH · \(strm.bitDepth)bit")
-                .font(Theme.monoDigit(11.5, weight: .medium))
-                .foregroundColor(Theme.textSecondary)
-                .lineLimit(1)
+            formatCapsuleGroup(sr: strm.sampleRate, ch: strm.channels, bit: strm.bitDepth)
                 .frame(width: 140, alignment: .leading)
 
             Text("\(fmtKbps(strm.kbps)) kbps")
@@ -210,8 +202,8 @@ struct MonitoringView: View {
             StatusLed(isActive: tx.enabled)
                 .frame(width: 26, alignment: .center)
 
-            Text(model.t("发送", "TX"))
-                .font(Theme.cnText(10.5, weight: .bold))
+            Text("TX")
+                .font(Theme.monoDigit(10.5, weight: .bold))
                 .foregroundColor(Theme.amberWarn)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 1.5)
@@ -228,10 +220,7 @@ struct MonitoringView: View {
                 .lineLimit(1)
                 .frame(width: 130, alignment: .leading)
 
-            Text("\(tx.sampleRate / 1000)kHz · \(tx.channels)CH · \(tx.bitDepth)bit")
-                .font(Theme.monoDigit(11.5, weight: .medium))
-                .foregroundColor(Theme.textSecondary)
-                .lineLimit(1)
+            formatCapsuleGroup(sr: tx.sampleRate, ch: tx.channels, bit: tx.bitDepth)
                 .frame(width: 140, alignment: .leading)
 
             Text("\(fmtKbps(tx.realKbps)) kbps")
@@ -281,21 +270,17 @@ struct MonitoringView: View {
 
     // 空状态面板
     private var emptyState: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             Image(systemName: "speedometer")
-                .font(.system(size: 34))
+                .font(.system(size: 28))
                 .foregroundColor(Theme.textTertiary)
 
             Text(model.t("暂无活动音频流遥测数据", "No Active Stream Telemetry"))
-                .font(Theme.cnText(14, weight: .bold))
-                .foregroundColor(Theme.textSecondary)
-
-            Text(model.t("当存在活动接收流或启用发送流时，此处将实时展示各流吞吐、微秒抖动与包率", "Active incoming and outgoing streams will display real-time throughput and loss here"))
-                .font(Theme.cnText(12, weight: .medium))
+                .font(Theme.cnText(13, weight: .semibold))
                 .foregroundColor(Theme.textTertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .help(model.t("在“音频流”页面配置并启动发送流，或从局域网对端发送音频至本机", "Configure and start streams in the Streams tab"))
+        .help(model.t("当存在活动接收流或启用发送流时，此处将实时展示各流吞吐、微秒抖动与包率", "Active incoming and outgoing streams will display real-time throughput and loss here"))
     }
 
     // 全局总丢包数
@@ -308,5 +293,25 @@ struct MonitoringView: View {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         return formatter.string(from: NSNumber(value: val)) ?? "\(val)"
+    }
+
+    // 音频规格卡片组
+    private func formatCapsuleGroup(sr: UInt32, ch: UInt32, bit: UInt32) -> some View {
+        HStack(spacing: 4) {
+            formatTag("\(sr / 1000)kHz")
+            formatTag("\(ch)CH")
+            formatTag("\(bit)bit")
+        }
+    }
+
+    // 单个微型胶囊
+    private func formatTag(_ text: String) -> some View {
+        Text(text)
+            .font(Theme.monoDigit(10.5, weight: .semibold))
+            .foregroundColor(Theme.textSecondary)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2.5)
+            .background(Color.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 3.5, style: .continuous))
     }
 }
