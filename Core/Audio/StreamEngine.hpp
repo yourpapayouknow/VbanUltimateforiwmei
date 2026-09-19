@@ -29,6 +29,30 @@ public:
     explicit StrmEngn(std::shared_ptr<RtEngn> rt) : rt_(std::move(rt)) {}
     ~StrmEngn() { stpall(); }
 
+    // 按网络质量档位换算起播预填帧数
+    static uint32_t qltfrms(uint8_t qlt, uint32_t ch, uint32_t sr) {
+        // 对齐官方 computeSize：档位决定可吸收的抖动时长
+        uint32_t smpls = 1024;
+        switch (qlt) {
+            case 0: smpls = 512;  break;
+            case 1: smpls = 1024; break;
+            case 2: smpls = 2048; break;
+            case 3: smpls = 4096; break;
+            case 4: smpls = 8192; break;
+            default: break;
+        }
+        // 档位值按采样率折算为对应时长
+        uint32_t frms = (sr ? sr : 48000) * smpls / 48000;
+        if (frms < 128) frms = 128;
+        return frms;
+    }
+
+    // 设置网络质量档位
+    void setqlt(uint8_t qlt) {
+        // 记录档位供起播预填使用
+        qlt_ = qlt;
+    }
+
     // 启动接收流回放：按流规格打开输出设备并直写样本
     bool strtrx(const DevInf& dev, const std::string& strm, const StrmCfg& cfg) {
         // 建立输出音频单元并绑定流回放回调
@@ -60,6 +84,13 @@ public:
             AudioUnitUninitialize(rx_unit_);
             clsunit(rx_unit_);
             return false;
+        }
+
+        // 起播预填静音，吸收初期的网络抖动
+        const uint32_t pre = qltfrms(qlt_, cfg.ch, cfg.sr);
+        if (rt_) {
+            std::vector<float> sil(static_cast<size_t>(pre) * cfg.ch, 0.0f);
+            rt_->wrrx(strm, sil.data(), sil.size());
         }
 
         rx_run_ = true;
@@ -281,6 +312,7 @@ private:
     AURenderCallbackStruct  tx_cb_{};
     std::vector<float>      cap_;
     std::vector<uint8_t>    abl_;
+    uint8_t                 qlt_{1};
 };
 
 #endif // __APPLE__

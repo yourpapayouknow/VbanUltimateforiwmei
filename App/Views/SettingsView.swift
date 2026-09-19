@@ -311,7 +311,7 @@ struct SettingsView: View {
                 .frame(width: 120)
             }
             .frame(height: 40)
-            .help(model.t("网络传输质量预设：\(model.networkQuality.desc(for: model.language))。动态调整抗抖动平滑缓冲深度，避免网络丢包产生爆音。", "Network transmission quality preset: \(model.networkQuality.desc(for: model.language)). Dynamically adjusts jitter buffer depth to prevent underruns."))
+            .help(model.t("网络传输质量预设：\(model.networkQuality.desc(for: model.language))。档位越高，回放起播预填的缓冲越深，可吸收的网络抖动越大，代价是起播延迟相应增加。", "Network transmission quality preset: \(model.networkQuality.desc(for: model.language)). Higher gears prefill a deeper playback buffer to absorb more network jitter, at the cost of added start-up latency."))
 
             Divider().background(Theme.borderSubtle)
 

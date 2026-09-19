@@ -105,6 +105,7 @@
         bound_port_       = 6980;
         net_qlt_          = 1;
         buffering_frames_ = 128;
+        seng_->setqlt(net_qlt_.load());
         rx_active_        = [NSMutableSet set];
         tx_active_        = [NSMutableSet set];
     }
@@ -154,6 +155,10 @@
     net_qlt_.store(quality);
     if (dmx_) {
         dmx_->setqlt(static_cast<vban::NetQlt>(quality));
+    }
+    // 档位同时用于回放起播预填深度
+    if (seng_) {
+        seng_->setqlt(quality);
     }
 }
 
