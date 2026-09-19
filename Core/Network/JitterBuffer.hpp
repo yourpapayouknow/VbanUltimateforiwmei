@@ -35,6 +35,13 @@ public:
     // 设置质量档位调整预缓冲深度
     void setqlt(NetQlt q) {
         // 设置目标缓冲深度毫秒数
+        cptqlt(q);
+        rstjtr();
+    }
+
+    // 按当前声道与采样率重算目标水位
+    void cptqlt(NetQlt q) {
+        // 依据档位毫秒数换算目标样本水位
         qlt_ = q;
         uint32_t ms = 20;
         switch (q) {
@@ -48,7 +55,6 @@ public:
         if (trgt_smpls_ < 128) {
             trgt_smpls_ = 128;
         }
-        rstjtr();
     }
 
     // 重置抖动缓冲
@@ -62,9 +68,10 @@ public:
     bool pshpkt(const PktInf& inf) {
         // 将不同整型/浮点格式的原始样本转为单精度浮点存入
         if (inf.ch != ch_ || inf.sr != sr_) {
+            // 采样率或声道变化仅重算水位，已收样本继续参与回放
             ch_ = inf.ch;
             sr_ = inf.sr;
-            setqlt(qlt_);
+            cptqlt(qlt_);
         }
 
         const uint32_t total_smpls = inf.smpls * inf.ch;
