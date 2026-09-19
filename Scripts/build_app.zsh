@@ -79,9 +79,11 @@ swiftc -O \
     -framework AppKit \
     -o "$MACOS_DIR/VBANUltimate"
 
-# 4. 代码签名
+# 4. 代码签名（携带音频输入权限声明）
 echo "Signing VBAN Ultimate application bundle..."
-codesign --force --deep --sign - "$APP_DIR"
+codesign --force --deep --sign - \
+    --entitlements "$PROJECT_DIR/Resources/VBANUltimate.entitlements" \
+    "$APP_DIR"
 codesign -dvvv "$APP_DIR" 2>&1 | grep -E "Identifier|Signature|Sealed"
 
 echo "Application built and signed successfully at: $APP_DIR"

@@ -191,14 +191,12 @@ private:
         return noErr;
     }
 
-    // 释放音频单元实例
-    void clsunit(AudioUnit& unit) {
-        // 销毁指定的 HAL 音频单元
+    // 释放指定音频单元实例
+    static void clsunit(AudioUnit& unit) {
+        // 销毁传入的 HAL 音频单元引用
         if (unit) {
             AudioComponentInstanceDispose(unit);
             unit = nullptr;
-            rx_unit_ = nullptr;
-            tx_unit_ = nullptr;
         }
     }
 
@@ -246,7 +244,6 @@ private:
         self->rt_->wrtx(self->tx_strm_, self->cap_.data(), cnt);
         return noErr;
     }
-
     std::shared_ptr<RtEngn> rt_;
     AudioUnit               rx_unit_{nullptr};
     AudioUnit               tx_unit_{nullptr};
