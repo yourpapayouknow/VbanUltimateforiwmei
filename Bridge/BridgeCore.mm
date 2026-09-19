@@ -203,10 +203,10 @@
     is_run_.store(true);
     tx_mgr_->strtall();
 
-    // 接收样本直达流回放缓冲
-    auto rt_ptr = rt_;
-    dmx_->setaudcb([rt_ptr](const char* strm, const float* smpls, size_t cnt, uint32_t) {
-        rt_ptr->wrrx(strm, smpls, cnt);
+    // 回放取自各流的抗抖动缓冲
+    auto jtr_src = dmx_;
+    seng_->setjtr([jtr_src](const std::string& strm) {
+        return jtr_src->gtjtr(strm);
     });
 
     auto sck_ptr = sck_;

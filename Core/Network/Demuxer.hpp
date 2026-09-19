@@ -79,6 +79,14 @@ public:
         aud_cb_ = std::move(cb);
     }
 
+    // 获取指定流的抖动缓冲
+    std::shared_ptr<JtrBuf> gtjtr(const std::string& strm) {
+        // 返回该流已建立的抗抖动缓冲
+        std::lock_guard<std::mutex> lock(mtx_);
+        auto it = strms_.find(strm);
+        return it == strms_.end() ? nullptr : it->second->jtr;
+    }
+
     // 分分解码并分发单个网络数据包
     bool dmxpkt(const uint8_t* dat, size_t len, const char* sip, uint16_t sprt) {
         // 服务协议探测报文优先分发

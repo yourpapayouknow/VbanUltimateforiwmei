@@ -13,7 +13,16 @@ namespace vban {
 // 单条 VBAN 流的设备回放与采集调度引擎
 class StrmEngn {
 public:
+    // 抖动缓冲解析函数签名
+    using JtrResl = std::function<std::shared_ptr<JtrBuf>(const std::string&)>;
+
     explicit StrmEngn(std::shared_ptr<RtEngn> rt) : rt_(std::move(rt)) {}
+
+    // 挂载抖动缓冲解析器
+    void setjtr(JtrResl cb) {
+        // 注册按流名取抖动缓冲的回调
+        jtr_ = std::move(cb);
+    }
     ~StrmEngn() { stpall(); }
 
     // 启动接收流回放：在指定输出设备上回放该流样本
@@ -221,31 +230,13 @@ private:
         const uint32_t dch = data->mBuffers[0].mNumberChannels ? data->mBuffers[0].mNumberChannels : 1;
         const size_t dcnt = static_cast<size_t>(frames) * dch;
 
-        const uint32_t sch = self->rx_srch_ ? self->rx_srch_ : dch;
-        if (self->rx_strm_.empty() || sch != dch) {
-            // 流声道与设备声道不一致时经暂存区重映射
-            const size_t scnt = static_cast<size_t>(frames) * sch;
-            if (self->rx_tmp_.size() < scnt) {
-                self->rx_tmp_.resize(scnt, 0.0f);
-            }
-            if (self->rx_strm_.empty() ||
-                self->rt_->rdrx(self->rx_strm_, self->rx_tmp_.data(), scnt) != scnt) {
-                std::memset(dst, 0, dcnt * sizeof(float));
-                return noErr;
-            }
-            for (uint32_t f = 0; f < frames; ++f) {
-                for (uint32_t c = 0; c < dch; ++c) {
-                    // 声道不足时复制末声道，多余声道丢弃
-                    const uint32_t sc = (c < sch) ? c : (sch - 1);
-                    dst[f * dch + c] = self->rx_tmp_[f * sch + sc];
-                }
-            }
+        // 经抗抖动缓冲取数，保证网络抖动与乱序被平滑
+        auto jb = self->jtr_ ? self->jtr_(self->rx_strm_) : nullptr;
+        if (!jb) {
+            std::memset(dst, 0, dcnt * sizeof(float));
             return noErr;
         }
-
-        if (self->rt_->rdrx(self->rx_strm_, dst, dcnt) != dcnt) {
-            std::memset(dst, 0, dcnt * sizeof(float));
-        }
+        jb->popblks(dst, dcnt);
         return noErr;
     }
 
@@ -277,6 +268,7 @@ private:
         return noErr;
     }
     std::shared_ptr<RtEngn> rt_;
+    JtrResl                 jtr_;
     AudioUnit               rx_unit_{nullptr};
     AudioUnit               tx_unit_{nullptr};
     bool                    rx_run_{false};
