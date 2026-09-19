@@ -16,6 +16,11 @@ struct AppMetrics {
     uint32_t actv_tx{0};
     uint32_t cbl_cnt{0};
     uint64_t totl_lost{0};
+    uint64_t totl_ordr{0};
+    uint64_t totl_undr{0};
+    uint64_t totl_ovr{0};
+    uint64_t totl_crpt{0};
+    uint64_t totl_err{0};
     bool     aud_run{false};
     bool     drv_ok{false};
     std::vector<StrmSnap> rx_snaps;
@@ -46,11 +51,16 @@ public:
         if (dmx_) {
             dmx_->chkall(3000); // 检查超时
             m.rx_snaps = dmx_->gtsnaps();
+            m.totl_crpt = dmx_->gtcrpt();
+            m.totl_err  = dmx_->gterrcnt();
             for (const auto& s : m.rx_snaps) {
                 if (s.stt == StrmStt::Active) {
                     m.actv_rx++;
                 }
                 m.totl_lost += s.lostcnt;
+                m.totl_ordr += s.ordrcnt;
+                m.totl_undr += s.undrcnt;
+                m.totl_ovr  += s.ovrcnt;
             }
         }
 

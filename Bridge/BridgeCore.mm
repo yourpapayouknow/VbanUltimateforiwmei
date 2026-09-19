@@ -185,6 +185,9 @@
             if (n > 0) {
                 dmx_ptr->dmxpkt(buf, n, sip, sprt);
             } else {
+                if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+                    dmx_ptr->upderr();
+                }
                 std::this_thread::sleep_for(std::chrono::microseconds(200));
             }
         }
@@ -354,6 +357,11 @@
     m.activeTx        = snap.actv_tx;
     m.cableCount      = snap.cbl_cnt;
     m.totalLost       = snap.totl_lost;
+    m.totalDisorder   = snap.totl_ordr;
+    m.totalUnderrun   = snap.totl_undr;
+    m.totalOverload   = snap.totl_ovr;
+    m.totalCorrupt    = snap.totl_crpt;
+    m.totalError      = snap.totl_err + (port_conflict_.load() ? 1 : 0);
     m.audioRunning    = snap.aud_run;
     m.driverInstalled = snap.drv_ok;
     m.portConflict    = port_conflict_.load();
@@ -389,6 +397,10 @@
         sm.lostCount       = s.lostcnt;
         sm.duplicateCount  = s.dupcnt;
         sm.orderErrorCount = s.ordrcnt;
+        sm.underrunCount   = s.undrcnt;
+        sm.overloadCount   = s.ovrcnt;
+        sm.corruptCount    = s.crptcnt;
+        sm.errorCount      = s.errcnt;
         sm.packetsPerSec   = s.pkts;
         sm.kbps            = s.kbps;
         sm.jitterMs        = s.jtr_ms;

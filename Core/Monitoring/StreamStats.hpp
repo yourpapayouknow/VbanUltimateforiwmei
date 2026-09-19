@@ -21,6 +21,10 @@ struct StrmSnap {
     uint64_t    lostcnt;
     uint64_t    dupcnt;
     uint64_t    ordrcnt;
+    uint64_t    undrcnt;
+    uint64_t    ovrcnt;
+    uint64_t    crptcnt;
+    uint64_t    errcnt;
     uint32_t    pkts;
     uint32_t    kbps;
     double      jtr_ms;
@@ -50,6 +54,8 @@ public:
         lostcnt_   = 0;
         dupcnt_    = 0;
         ordrcnt_   = 0;
+        crptcnt_   = 0;
+        errcnt_    = 0;
         last_frm_  = 0;
         has_frm_   = false;
         pkts_      = 0;
@@ -145,6 +151,10 @@ public:
         sn.lostcnt = lostcnt_;
         sn.dupcnt  = dupcnt_;
         sn.ordrcnt = ordrcnt_;
+        sn.undrcnt = 0;
+        sn.ovrcnt  = 0;
+        sn.crptcnt = crptcnt_;
+        sn.errcnt  = errcnt_;
         sn.pkts    = pkts_;
         sn.kbps    = kbps_;
         sn.jtr_ms  = jtr_;
@@ -153,6 +163,12 @@ public:
         sn.last_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_rcv_).count();
         return sn;
     }
+
+    // 记录损坏包与错误计数
+    void updcrpt() { crptcnt_++; }
+    void upderr() { errcnt_++; }
+    uint64_t gtcrpt() const { return crptcnt_; }
+    uint64_t gterrcnt() const { return errcnt_; }
 
 private:
     char        strm_[kStrmSz + 1];
@@ -167,6 +183,8 @@ private:
     uint64_t    lostcnt_{0};
     uint64_t    dupcnt_{0};
     uint64_t    ordrcnt_{0};
+    uint64_t    crptcnt_{0};
+    uint64_t    errcnt_{0};
     uint32_t    last_frm_{0};
     bool        has_frm_{false};
     uint32_t    pkts_{0};

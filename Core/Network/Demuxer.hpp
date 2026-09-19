@@ -74,6 +74,7 @@ public:
         // 将收到的数据包精准路由至对应流上下文
         PktInf inf{};
         if (!prspkt(dat, len, &inf)) {
+            crptcnt_++;
             return false;
         }
 
@@ -112,7 +113,9 @@ public:
         if (!target->jtr) {
             target->jtr = std::make_shared<JtrBuf>(inf.ch, inf.sr, def_qlt_);
         }
-        target->jtr->pshpkt(inf);
+        if (!target->jtr->pshpkt(inf)) {
+            target->stts.updcrpt();
+        }
 
         // 派发回调
         if (target->cb) {
@@ -155,7 +158,12 @@ public:
         std::lock_guard<std::mutex> lock(mtx_);
         snaps.reserve(strms_.size());
         for (const auto& pair : strms_) {
-            snaps.push_back(pair.second->stts.gtsnap());
+            auto sn = pair.second->stts.gtsnap();
+            if (pair.second->jtr) {
+                sn.undrcnt = pair.second->jtr->gtundr();
+                sn.ovrcnt  = pair.second->jtr->gtovr();
+            }
+            snaps.push_back(sn);
         }
         return snaps;
     }
@@ -167,11 +175,28 @@ public:
         return strms_.size();
     }
 
+    // 获取全局损坏报文计数
+    uint64_t gtcrpt() const {
+        return crptcnt_.load(std::memory_order_relaxed);
+    }
+
+    // 获取全局套接字错误计数
+    uint64_t gterrcnt() const {
+        return errcnt_.load(std::memory_order_relaxed);
+    }
+
+    // 记录全局套接字错误
+    void upderr() {
+        errcnt_.fetch_add(1, std::memory_order_relaxed);
+    }
+
 private:
     mutable std::mutex mtx_;
     std::unordered_map<std::string, std::shared_ptr<StrmCtx>> strms_;
     std::atomic<bool> auto_dsc_;
     NetQlt            def_qlt_{NetQlt::Fast};
+    std::atomic<uint64_t> crptcnt_{0};
+    std::atomic<uint64_t> errcnt_{0};
 };
 
 } // namespace vban

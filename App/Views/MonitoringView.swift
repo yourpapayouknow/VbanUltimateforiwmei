@@ -39,10 +39,22 @@ struct MonitoringView: View {
             Spacer()
 
             ParamCapsule(
+                text: model.metrics.totalUnderrun > 0 ? "\(model.t("欠载", "Underrun")) \(model.metrics.totalUnderrun)" : model.t("缓冲稳定", "Buffer Healthy"),
+                color: model.metrics.totalUnderrun > 0 ? Theme.alertRed : Theme.meterGreen
+            )
+            .help(model.t("Underrun (欠载抽空)：接收端未及时获取数据包或缓冲耗尽，导致音频静音补零或爆音。当前累计：\(model.metrics.totalUnderrun) 次", "Buffer starvation. Audio was silenced or dropped. Total: \(model.metrics.totalUnderrun)"))
+
+            ParamCapsule(
                 text: totalLostPackets > 0 ? "\(totalLostPackets) \(model.t("丢包", "Lost"))" : model.t("传输健康", "Healthy"),
                 color: totalLostPackets > 0 ? Theme.alertRed : Theme.meterGreen
             )
             .help(model.t("全系统累计网络丢包总数。大于零时提示网络存在丢包，可能导致音频断音或顿挫。", "Total network packet loss. Greater than zero indicates dropouts."))
+
+            ParamCapsule(
+                text: (model.metrics.totalCorrupt + model.metrics.totalError) > 0 ? "\(model.t("异常", "Errors")) \(model.metrics.totalCorrupt + model.metrics.totalError)" : model.t("协议合规", "Valid"),
+                color: (model.metrics.totalCorrupt + model.metrics.totalError) > 0 ? Theme.alertRed : Theme.textSecondary
+            )
+            .help(model.t("Corrupt (报文损坏畸变) 与 Error (网络套接字错误) 统计。损坏：\(model.metrics.totalCorrupt)，错误：\(model.metrics.totalError)", "Corrupt packets and socket errors"))
 
             ParamCapsule(
                 text: model.networkQuality.title(for: model.language),
@@ -65,29 +77,33 @@ struct MonitoringView: View {
     private var tableHeader: some View {
         HStack(spacing: 6) {
             Text(model.t("状态", "Status"))
-                .frame(width: 32, alignment: .center)
+                .frame(width: 26, alignment: .center)
             Text(model.t("类型", "Type"))
-                .frame(width: 44, alignment: .center)
+                .frame(width: 36, alignment: .center)
             Text(model.t("流标识", "Stream ID"))
-                .frame(width: 130, alignment: .leading)
+                .frame(width: 110, alignment: .leading)
             Text(model.t("端点地址", "Endpoint"))
                 .frame(width: 130, alignment: .leading)
             Text(model.t("音频规格", "Format"))
                 .frame(width: 140, alignment: .leading)
             Text(model.t("有效带宽", "Bandwidth"))
-                .frame(width: 85, alignment: .trailing)
-            Text(model.t("网络包率", "Packet Rate"))
                 .frame(width: 75, alignment: .trailing)
-            Text(model.t("丢包", "Loss"))
-                .frame(width: 60, alignment: .trailing)
+            Text(model.t("网络包率", "Packet Rate"))
+                .frame(width: 68, alignment: .trailing)
+            Text(model.t("丢包", "Missing"))
+                .frame(width: 46, alignment: .trailing)
             Text(model.t("乱序", "Disorder"))
-                .frame(width: 60, alignment: .trailing)
-            Text(model.t("重复", "Duplicates"))
-                .frame(width: 60, alignment: .trailing)
+                .frame(width: 46, alignment: .trailing)
+            Text(model.t("欠载", "Underrun"))
+                .frame(width: 46, alignment: .trailing)
+            Text(model.t("过载", "Overload"))
+                .frame(width: 46, alignment: .trailing)
+            Text(model.t("损坏", "Corrupt"))
+                .frame(width: 46, alignment: .trailing)
             Text(model.t("网络抖动", "Jitter"))
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                .frame(minWidth: 60, maxWidth: .infinity, alignment: .trailing)
         }
-        .font(Theme.cnText(12, weight: .bold))
+        .font(Theme.cnText(11, weight: .bold))
         .foregroundColor(Theme.textTertiary)
         .padding(.horizontal, 16)
         .frame(height: 30)
@@ -117,19 +133,19 @@ struct MonitoringView: View {
     private func rxTelemetryRow(idx: Int, strm: VbanStrmMetric) -> some View {
         HStack(spacing: 6) {
             StatusLed(isActive: strm.status == "Active")
-                .frame(width: 32, alignment: .center)
+                .frame(width: 26, alignment: .center)
 
-            Text(model.t("接收", "RCV"))
+            Text(model.t("接收", "RX"))
                 .font(Theme.cnText(10.5, weight: .bold))
                 .foregroundColor(Theme.neonCyan)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 1.5)
                 .background(Theme.neonCyan.opacity(0.15))
                 .cornerRadius(3)
-                .frame(width: 44, alignment: .center)
+                .frame(width: 36, alignment: .center)
 
             RollingLabel(text: strm.name, font: Theme.monoDigit(13, weight: .bold), color: Theme.textPrimary)
-                .frame(width: 130, alignment: .leading)
+                .frame(width: 110, alignment: .leading)
 
             Text("\(strm.srcIp):\(strm.srcPort)")
                 .font(Theme.monoDigit(11.5, weight: .medium))
@@ -146,32 +162,42 @@ struct MonitoringView: View {
             Text("\(fmtKbps(strm.kbps)) kbps")
                 .font(Theme.monoDigit(12, weight: .bold))
                 .foregroundColor(Theme.neonCyan)
-                .frame(width: 85, alignment: .trailing)
+                .frame(width: 75, alignment: .trailing)
 
             Text("\(strm.packetsPerSec) pkt/s")
                 .font(Theme.monoDigit(11.5, weight: .semibold))
                 .foregroundColor(Theme.textSecondary)
-                .frame(width: 75, alignment: .trailing)
+                .frame(width: 68, alignment: .trailing)
 
             Text("\(strm.lostCount)")
-                .font(Theme.monoDigit(12, weight: .bold))
+                .font(Theme.monoDigit(11.5, weight: .bold))
                 .foregroundColor(strm.lostCount > 0 ? Theme.alertRed : Theme.meterGreen)
-                .frame(width: 60, alignment: .trailing)
+                .frame(width: 46, alignment: .trailing)
 
             Text("\(strm.orderErrorCount)")
                 .font(Theme.monoDigit(11.5, weight: .semibold))
                 .foregroundColor(strm.orderErrorCount > 0 ? Theme.amberWarn : Theme.textTertiary)
-                .frame(width: 60, alignment: .trailing)
+                .frame(width: 46, alignment: .trailing)
 
-            Text("\(strm.duplicateCount)")
+            Text("\(strm.underrunCount)")
+                .font(Theme.monoDigit(11.5, weight: .bold))
+                .foregroundColor(strm.underrunCount > 0 ? Theme.alertRed : Theme.textTertiary)
+                .frame(width: 46, alignment: .trailing)
+
+            Text("\(strm.overloadCount)")
                 .font(Theme.monoDigit(11.5, weight: .semibold))
-                .foregroundColor(strm.duplicateCount > 0 ? Theme.amberWarn : Theme.textTertiary)
-                .frame(width: 60, alignment: .trailing)
+                .foregroundColor(strm.overloadCount > 0 ? Theme.amberWarn : Theme.textTertiary)
+                .frame(width: 46, alignment: .trailing)
+
+            Text("\(strm.corruptCount)")
+                .font(Theme.monoDigit(11.5, weight: .semibold))
+                .foregroundColor(strm.corruptCount > 0 ? Theme.alertRed : Theme.textTertiary)
+                .frame(width: 46, alignment: .trailing)
 
             Text(String(format: "%.1f ms", strm.jitterMs))
                 .font(Theme.monoDigit(11.5, weight: .semibold))
                 .foregroundColor(strm.jitterMs > 20.0 ? Theme.amberWarn : Theme.meterGreen)
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                .frame(minWidth: 60, maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, 16)
         .frame(height: 38)
@@ -182,19 +208,19 @@ struct MonitoringView: View {
     private func txTelemetryRow(idx: Int, tx: VbanTxStreamDesc) -> some View {
         HStack(spacing: 6) {
             StatusLed(isActive: tx.enabled)
-                .frame(width: 32, alignment: .center)
+                .frame(width: 26, alignment: .center)
 
-            Text(model.t("发送", "SND"))
+            Text(model.t("发送", "TX"))
                 .font(Theme.cnText(10.5, weight: .bold))
                 .foregroundColor(Theme.amberWarn)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 1.5)
                 .background(Theme.amberWarn.opacity(0.15))
                 .cornerRadius(3)
-                .frame(width: 44, alignment: .center)
+                .frame(width: 36, alignment: .center)
 
             RollingLabel(text: tx.name, font: Theme.monoDigit(13, weight: .bold), color: Theme.textPrimary)
-                .frame(width: 130, alignment: .leading)
+                .frame(width: 110, alignment: .leading)
 
             Text("\(tx.targetIp):\(tx.targetPort)")
                 .font(Theme.monoDigit(11.5, weight: .medium))
@@ -211,32 +237,42 @@ struct MonitoringView: View {
             Text("\(fmtKbps(tx.realKbps)) kbps")
                 .font(Theme.monoDigit(12, weight: .bold))
                 .foregroundColor(Theme.neonCyan)
-                .frame(width: 85, alignment: .trailing)
+                .frame(width: 75, alignment: .trailing)
 
             Text("\(tx.sampleRate / max(1, model.bufferingFrames)) pkt/s")
                 .font(Theme.monoDigit(11.5, weight: .semibold))
                 .foregroundColor(Theme.textSecondary)
-                .frame(width: 75, alignment: .trailing)
+                .frame(width: 68, alignment: .trailing)
 
             Text("0")
-                .font(Theme.monoDigit(12, weight: .bold))
+                .font(Theme.monoDigit(11.5, weight: .bold))
                 .foregroundColor(Theme.meterGreen)
-                .frame(width: 60, alignment: .trailing)
+                .frame(width: 46, alignment: .trailing)
 
             Text("-")
                 .font(Theme.monoDigit(11.5, weight: .medium))
                 .foregroundColor(Theme.textTertiary)
-                .frame(width: 60, alignment: .trailing)
+                .frame(width: 46, alignment: .trailing)
 
             Text("-")
                 .font(Theme.monoDigit(11.5, weight: .medium))
                 .foregroundColor(Theme.textTertiary)
-                .frame(width: 60, alignment: .trailing)
+                .frame(width: 46, alignment: .trailing)
 
             Text("-")
                 .font(Theme.monoDigit(11.5, weight: .medium))
                 .foregroundColor(Theme.textTertiary)
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                .frame(width: 46, alignment: .trailing)
+
+            Text("-")
+                .font(Theme.monoDigit(11.5, weight: .medium))
+                .foregroundColor(Theme.textTertiary)
+                .frame(width: 46, alignment: .trailing)
+
+            Text("-")
+                .font(Theme.monoDigit(11.5, weight: .medium))
+                .foregroundColor(Theme.textTertiary)
+                .frame(minWidth: 60, maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, 16)
         .frame(height: 38)
