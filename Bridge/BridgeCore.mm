@@ -10,6 +10,8 @@
 #include "../Core/Audio/DeviceCatalog.hpp"
 #include "../Core/Audio/CableManager.hpp"
 #include "../Core/Routing/MatrixRouter.hpp"
+#include "../Core/Routing/RouteEngine.hpp"
+#include "../Core/Audio/StreamEngine.hpp"
 #include "../Core/Network/TxManager.hpp"
 #include "../Core/Monitoring/MetricsEngine.hpp"
 #include <thread>
@@ -44,6 +46,8 @@
     std::shared_ptr<vban::StrmDmx>    dmx_;
     std::shared_ptr<vban::CblMgr>     cbl_;
     std::shared_ptr<vban::MtrxRtr>    rtr_;
+    std::shared_ptr<vban::RtEngn>     rt_;
+    std::shared_ptr<vban::StrmEngn>   seng_;
     std::shared_ptr<vban::TxMgr>      tx_mgr_;
     std::shared_ptr<vban::MtrcsEngn>  mtr_;
     std::thread                       rx_th_;
@@ -76,7 +80,10 @@
         dmx_           = std::make_shared<vban::StrmDmx>();
         cbl_           = std::make_shared<vban::CblMgr>();
         rtr_           = std::make_shared<vban::MtrxRtr>();
+        rt_            = std::make_shared<vban::RtEngn>();
+        seng_          = std::make_shared<vban::StrmEngn>(rt_);
         tx_mgr_        = std::make_shared<vban::TxMgr>();
+        tx_mgr_->setrt(rt_);
         mtr_           = std::make_shared<vban::MtrcsEngn>(dmx_, cbl_, rtr_, tx_mgr_);
         th_run_           = false;
         is_run_           = false;
@@ -179,6 +186,12 @@
     th_run_.store(true);
     is_run_.store(true);
     tx_mgr_->strtall();
+
+    // 接收样本直达流回放缓冲
+    auto rt_ptr = rt_;
+    dmx_->setaudcb([rt_ptr](const char* strm, const float* smpls, size_t cnt, uint32_t) {
+        rt_ptr->wrrx(strm, smpls, cnt);
+    });
 
     auto sck_ptr = sck_;
     auto dmx_ptr = dmx_;
@@ -376,6 +389,95 @@
 - (void)clearTxStreams {
     // 清空全部发送流
     tx_mgr_->clrstrms();
+}
+
+// 按设备标识检索音频设备
+- (nullable VbanAudioDevDesc *)findDeviceByUid:(NSString *)uid {
+    // 在已枚举设备中匹配唯一标识
+    if (!uid || uid.length == 0) return nil;
+    for (VbanAudioDevDesc *d in [self getDevices]) {
+        if ([d.uid isEqualToString:uid]) return d;
+    }
+    return nil;
+}
+
+// 将接收流回放指派到指定输出设备
+- (BOOL)assignRxStream:(NSString *)strm toDevice:(NSString *)devUid channels:(uint32_t)ch sampleRate:(uint32_t)sr {
+    // 绑定接收流并启动其回放通路
+    if (!strm || strm.length == 0) return NO;
+
+    seng_->stprx();
+    [self clearRxAssign:strm];
+
+    if (!devUid || devUid.length == 0) return YES;
+
+    VbanAudioDevDesc *desc = [self findDeviceByUid:devUid];
+    if (!desc || desc.outChannels == 0) return NO;
+
+    vban::DevInf inf{};
+    inf.id     = desc.devId;
+    inf.uid    = [devUid UTF8String];
+    inf.name   = [desc.name UTF8String];
+    inf.inchs  = desc.inChannels;
+    inf.outchs = desc.outChannels;
+    inf.sr     = desc.sampleRate;
+
+    const uint32_t use_ch = ch ? ch : desc.outChannels;
+    rt_->setrxdev([strm UTF8String], [devUid UTF8String], use_ch, sr ? sr : 48000);
+    rt_->rstbuf([strm UTF8String], use_ch, sr ? sr : 48000);
+    return seng_->strtrx(inf, [strm UTF8String], use_ch) ? YES : NO;
+}
+
+// 将发送流采集指派到指定输入设备
+- (BOOL)assignTxStream:(NSString *)strm toDevice:(NSString *)devUid channels:(uint32_t)ch sampleRate:(uint32_t)sr {
+    // 绑定发送流并启动其采集通路
+    if (!strm || strm.length == 0) return NO;
+
+    seng_->stptx();
+
+    if (!devUid || devUid.length == 0) {
+        rt_->settxdev([strm UTF8String], "", 0, 0);
+        return YES;
+    }
+
+    VbanAudioDevDesc *desc = [self findDeviceByUid:devUid];
+    if (!desc || desc.inChannels == 0) return NO;
+
+    vban::DevInf inf{};
+    inf.id     = desc.devId;
+    inf.uid    = [devUid UTF8String];
+    inf.name   = [desc.name UTF8String];
+    inf.inchs  = desc.inChannels;
+    inf.outchs = desc.outChannels;
+    inf.sr     = desc.sampleRate;
+
+    const uint32_t use_ch = ch ? ch : (desc.inChannels ? desc.inChannels : 1);
+    rt_->settxdev([strm UTF8String], [devUid UTF8String], use_ch, sr ? sr : 48000);
+    return seng_->strttx(inf, [strm UTF8String], use_ch) ? YES : NO;
+}
+
+// 解除接收流的设备指派
+- (void)clearRxAssign:(NSString *)strm {
+    // 停止回放并清除绑定记录
+    if (!strm || strm.length == 0) return;
+    seng_->stprx();
+    rt_->clrrxdev([strm UTF8String]);
+}
+
+// 查询接收流已指派设备
+- (nullable NSString *)rxDeviceOfStream:(NSString *)strm {
+    // 返回接收流绑定的输出设备标识
+    if (!strm || strm.length == 0) return nil;
+    const std::string uid = rt_->gtrxdev([strm UTF8String]);
+    return uid.empty() ? nil : [NSString stringWithUTF8String:uid.c_str()];
+}
+
+// 查询发送流已指派设备
+- (nullable NSString *)txDeviceOfStream:(NSString *)strm {
+    // 返回发送流绑定的输入设备标识
+    if (!strm || strm.length == 0) return nil;
+    const std::string uid = rt_->gttxdev([strm UTF8String]);
+    return uid.empty() ? nil : [NSString stringWithUTF8String:uid.c_str()];
 }
 
 - (VbanAppMetric *)getSnapshot {

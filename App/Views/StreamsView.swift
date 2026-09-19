@@ -185,6 +185,18 @@ struct RxStreamCard: View {
     let strm: VbanStrmMetric
     @ObservedObject var model: AppModel
 
+    // 可选回放设备
+    private var outDevs: [VbanAudioDevDesc] {
+        model.devices.filter { $0.outChannels > 0 }
+    }
+
+    // 回放设备显示标签
+    private var devLabel: String {
+        // 未指派时显示占位名称
+        let name = model.rxDeviceName(stream: strm.name)
+        return name.isEmpty ? model.t("指派设备", "Assign") : name
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // 卡片顶栏：状态 + 流名称 + 采样格式胶囊
@@ -196,6 +208,31 @@ struct RxStreamCard: View {
                     .foregroundColor(Theme.textPrimary)
 
                 Spacer()
+
+                // 回放设备指派
+                Menu {
+                    Button(model.t("不指派", "Unassigned")) {
+                        model.assignRxDevice(stream: strm.name, deviceUid: "")
+                    }
+                    Divider()
+                    ForEach(outDevs, id: \.uid) { d in
+                        Button(d.name) {
+                            model.assignRxDevice(stream: strm.name, deviceUid: d.uid)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "speaker.wave.2")
+                            .font(.system(size: 9.5, weight: .bold))
+                        Text(devLabel)
+                            .font(Theme.cnText(11.5, weight: .semibold))
+                            .lineLimit(1)
+                    }
+                    .foregroundColor(model.rxAssign[strm.name] == nil ? Theme.textTertiary : Theme.neonCyan)
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help(model.t("将本接收流回放到指定输出设备", "Play this incoming stream to the selected output device"))
 
                 ParamCapsule(text: "\(strm.sampleRate / 1000)kHz")
                 ParamCapsule(text: "\(strm.channels)CH")
@@ -436,11 +473,8 @@ struct EditTxStreamSheet: View {
                         .font(Theme.cnText(12.5, weight: .semibold))
                         .frame(width: 90, alignment: .trailing)
                     Picker("", selection: $source) {
-                        ForEach(model.cables, id: \.name) { c in
-                            Text(model.t("线缆: \(c.name)", "Cable: \(c.name)")).tag(c.name)
-                        }
-                        ForEach(model.devices, id: \.name) { d in
-                            Text(model.t("设备: \(d.name)", "Device: \(d.name)")).tag(d.name)
+                        ForEach(model.devices.filter { $0.inChannels > 0 }, id: \.uid) { d in
+                            Text(d.name).tag(d.uid)
                         }
                     }
                     .pickerStyle(MenuPickerStyle())
@@ -503,8 +537,8 @@ struct EditTxStreamSheet: View {
 
                 Button(action: {
                     let p = UInt16(targetPort) ?? tx.targetPort
-                    let src = source.isEmpty ? tx.sourceName : source
-                    model.updateTxStream(id: tx.id, name: name, sourceName: src, targetIp: targetIp, targetPort: p, sampleRate: sampleRate, channels: channels, bitDepth: bitDepth)
+                    let srcName = model.devices.first { $0.uid == source }?.name ?? tx.sourceName
+                    model.updateTxStream(id: tx.id, name: name, sourceName: srcName, targetIp: targetIp, targetPort: p, sampleRate: sampleRate, channels: channels, bitDepth: bitDepth, deviceUid: source)
                     isPresented = false
                 }) {
                     Text(model.t("保存配置", "Save Settings"))
@@ -520,7 +554,7 @@ struct EditTxStreamSheet: View {
         .background(Theme.windowBg)
         .onAppear {
             name = tx.name
-            source = tx.sourceName
+            source = tx.deviceUid.isEmpty ? (model.devices.first { $0.inChannels > 0 }?.uid ?? "") : tx.deviceUid
             targetIp = tx.targetIp
             targetPort = String(tx.targetPort)
             sampleRate = tx.sampleRate
@@ -569,11 +603,8 @@ struct AddTxStreamSheet: View {
                         .font(Theme.cnText(12.5, weight: .semibold))
                         .frame(width: 90, alignment: .trailing)
                     Picker("", selection: $source) {
-                        ForEach(model.cables, id: \.name) { c in
-                            Text(model.t("线缆: \(c.name)", "Cable: \(c.name)")).tag(c.name)
-                        }
-                        ForEach(model.devices, id: \.name) { d in
-                            Text(model.t("设备: \(d.name)", "Device: \(d.name)")).tag(d.name)
+                        ForEach(model.devices.filter { $0.inChannels > 0 }, id: \.uid) { d in
+                            Text(d.name).tag(d.uid)
                         }
                     }
                     .pickerStyle(MenuPickerStyle())
@@ -636,8 +667,8 @@ struct AddTxStreamSheet: View {
 
                 Button(action: {
                     let p = UInt16(targetPort) ?? 6980
-                    let src = source.isEmpty ? (model.cables.first?.name ?? "VBAN Cable A") : source
-                    model.addTxStream(name: name, sourceName: src, targetIp: targetIp, targetPort: p, sampleRate: sampleRate, channels: channels, bitDepth: bitDepth)
+                    let srcName = model.devices.first { $0.uid == source }?.name ?? ""
+                    model.addTxStream(name: name, sourceName: srcName, targetIp: targetIp, targetPort: p, sampleRate: sampleRate, channels: channels, bitDepth: bitDepth, deviceUid: source)
                     isPresented = false
                 }) {
                     Text(model.t("创建并启用", "Create & Enable"))
@@ -653,7 +684,7 @@ struct AddTxStreamSheet: View {
         .background(Theme.windowBg)
         .onAppear {
             if source.isEmpty {
-                source = model.cables.first?.name ?? model.devices.first?.name ?? "VBAN Cable A"
+                source = model.devices.first { $0.inChannels > 0 }?.uid ?? ""
             }
         }
     }

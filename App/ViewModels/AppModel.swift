@@ -80,11 +80,12 @@ struct VbanTxStreamDesc: Identifiable, Codable {
     var channels: UInt32
     var bitDepth: UInt32
     var enabled: Bool
+    var deviceUid: String = ""
     var kbps: UInt32 = 0
     var packetsPerSec: UInt32 = 0
 
     enum CodingKeys: String, CodingKey {
-        case id, name, sourceName, targetIp, targetPort, sampleRate, channels, bitDepth, enabled
+        case id, name, sourceName, targetIp, targetPort, sampleRate, channels, bitDepth, enabled, deviceUid
     }
 
     // 真实的无压缩 PCM 传输比特率（kbps）
@@ -179,6 +180,9 @@ final class AppModel: ObservableObject {
     // VBAN Ping 记录
     @Published var pingRecords: [VbanPingRecord] = []
     @Published var latestPing: VbanPingRecord? = nil
+
+    // 接收流已指派的回放设备标识
+    @Published var rxAssign: [String: String] = [:]
 
     // 本机网络 IP 与节点用户名
     @Published var hostIpAddress: String = ""
@@ -407,6 +411,9 @@ final class AppModel: ObservableObject {
         for s in txStreams {
             _ = bridge.addTxStream(withId: s.id, name: s.name, source: s.sourceName, targetIp: s.targetIp, port: s.targetPort, sampleRate: s.sampleRate, channels: s.channels, bitDepth: s.bitDepth)
             _ = bridge.setTxStreamEnabled(s.id, enabled: s.enabled)
+            if !s.deviceUid.isEmpty {
+                _ = bridge.assignTxStream(s.name, toDevice: s.deviceUid, channels: s.channels, sampleRate: s.sampleRate)
+            }
         }
     }
 
@@ -421,21 +428,29 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func addTxStream(name: String, sourceName: String, targetIp: String, targetPort: UInt16, sampleRate: UInt32, channels: UInt32, bitDepth: UInt32) {
+    func addTxStream(name: String, sourceName: String, targetIp: String, targetPort: UInt16, sampleRate: UInt32, channels: UInt32, bitDepth: UInt32, deviceUid: String = "") {
         let sId = "tx_\(UUID().uuidString.prefix(8))"
-        let item = VbanTxStreamDesc(id: sId, name: name, sourceName: sourceName, targetIp: targetIp, targetPort: targetPort, sampleRate: sampleRate, channels: channels, bitDepth: bitDepth, enabled: true)
+        var item = VbanTxStreamDesc(id: sId, name: name, sourceName: sourceName, targetIp: targetIp, targetPort: targetPort, sampleRate: sampleRate, channels: channels, bitDepth: bitDepth, enabled: true)
+        item.deviceUid = deviceUid
         txStreams.append(item)
         _ = bridge.addTxStream(withId: sId, name: name, source: sourceName, targetIp: targetIp, port: targetPort, sampleRate: sampleRate, channels: channels, bitDepth: bitDepth)
         _ = bridge.setTxStreamEnabled(sId, enabled: true)
+        if !deviceUid.isEmpty {
+            _ = bridge.assignTxStream(name, toDevice: deviceUid, channels: channels, sampleRate: sampleRate)
+        }
     }
 
     func removeTxStream(id: String) {
+        if let tx = txStreams.first(where: { $0.id == id }) {
+            _ = bridge.assignTxStream(tx.name, toDevice: "", channels: 0, sampleRate: 0)
+        }
         txStreams.removeAll { $0.id == id }
         _ = bridge.removeTxStream(withId: id)
     }
 
-    func updateTxStream(id: String, name: String, sourceName: String, targetIp: String, targetPort: UInt16, sampleRate: UInt32, channels: UInt32, bitDepth: UInt32) {
+    func updateTxStream(id: String, name: String, sourceName: String, targetIp: String, targetPort: UInt16, sampleRate: UInt32, channels: UInt32, bitDepth: UInt32, deviceUid: String = "") {
         if let idx = txStreams.firstIndex(where: { $0.id == id }) {
+            let oldName = txStreams[idx].name
             txStreams[idx].name = name
             txStreams[idx].sourceName = sourceName
             txStreams[idx].targetIp = targetIp
@@ -443,8 +458,16 @@ final class AppModel: ObservableObject {
             txStreams[idx].sampleRate = sampleRate
             txStreams[idx].channels = channels
             txStreams[idx].bitDepth = bitDepth
+            txStreams[idx].deviceUid = deviceUid
             _ = bridge.addTxStream(withId: id, name: name, source: sourceName, targetIp: targetIp, port: targetPort, sampleRate: sampleRate, channels: channels, bitDepth: bitDepth)
             _ = bridge.setTxStreamEnabled(id, enabled: txStreams[idx].enabled)
+            if oldName != name {
+                _ = bridge.assignTxStream(oldName, toDevice: "", channels: 0, sampleRate: 0)
+            }
+            if !deviceUid.isEmpty {
+                let dev = devices.first { $0.uid == deviceUid }
+                _ = bridge.assignTxStream(name, toDevice: deviceUid, channels: dev?.inChannels ?? channels, sampleRate: sampleRate)
+            }
         }
     }
 
@@ -509,6 +532,48 @@ final class AppModel: ObservableObject {
             routes = bridge.getRoutes()
             devices = bridge.getDevices()
         }
+    }
+
+    // 接收流指派输出设备
+    func assignRxDevice(stream: String, deviceUid: String) {
+        // 绑定接收流回放设备并记录状态
+        let dev = devices.first { $0.uid == deviceUid }
+        let ch = dev?.outChannels ?? 2
+        if deviceUid.isEmpty {
+            bridge.clearRxAssign(stream)
+            rxAssign.removeValue(forKey: stream)
+        } else if bridge.assignRxStream(stream, toDevice: deviceUid, channels: ch, sampleRate: 48000) {
+            rxAssign[stream] = deviceUid
+        } else {
+            rxAssign.removeValue(forKey: stream)
+        }
+    }
+
+    // 发送流指派输入设备
+    func assignTxDevice(streamId: String, deviceUid: String) {
+        // 绑定发送流采集设备并持久化配置
+        guard let idx = txStreams.firstIndex(where: { $0.id == streamId }) else { return }
+        let name = txStreams[idx].name
+        let dev = devices.first { $0.uid == deviceUid }
+        let ch = dev?.inChannels ?? 1
+
+        txStreams[idx].deviceUid = deviceUid
+        txStreams[idx].sourceName = dev?.name ?? ""
+        _ = bridge.assignTxStream(name, toDevice: deviceUid, channels: ch, sampleRate: txStreams[idx].sampleRate)
+    }
+
+    // 查询输出设备名称
+    func rxDeviceName(stream: String) -> String {
+        // 返回接收流已指派设备名称
+        guard let uid = rxAssign[stream] else { return "" }
+        return devices.first { $0.uid == uid }?.name ?? ""
+    }
+
+    // 查询发送流已指派设备名称
+    func txDeviceName(streamId: String) -> String {
+        // 返回发送流已指派设备名称
+        guard let tx = txStreams.first(where: { $0.id == streamId }), !tx.deviceUid.isEmpty else { return "" }
+        return devices.first { $0.uid == tx.deviceUid }?.name ?? tx.sourceName
     }
 
     // 矩阵路由操作

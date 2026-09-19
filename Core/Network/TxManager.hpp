@@ -6,6 +6,7 @@
 #include "../VBAN/Protocol.hpp"
 #include "../VBAN/Packetizer.hpp"
 #include "../Monitoring/StreamStats.hpp"
+#include "../Routing/RouteEngine.hpp"
 #include "UdpSocket.hpp"
 #include <thread>
 #include <atomic>
@@ -135,6 +136,12 @@ public:
         }
     }
 
+    // 绑定流指派引擎
+    void setrt(std::shared_ptr<RtEngn> rt) {
+        // 挂载采集样本来源引擎
+        rt_ = std::move(rt);
+    }
+
     // 获取发送流指标快照
     std::vector<StrmSnap> gtsnaps() {
         std::lock_guard<std::mutex> lock(mtx_);
@@ -178,11 +185,85 @@ private:
         }
     }
 
+    // 单包承载的采样帧数
+    static constexpr uint32_t kSmplsPerPkt = 256;
+
+    // 采集样本并按流格式编码负载
+    size_t gtpyld(TxStreamCtx& s, uint8_t* dst, size_t maxlen) {
+        // 取出采集样本并按流格式量化写入负载区
+        const uint32_t smpls = kSmplsPerPkt;
+        const uint32_t ch    = s.ch ? s.ch : 1;
+        const uint32_t bpsz  = gtbpsz(s.fmt);
+        const size_t   total = static_cast<size_t>(smpls) * ch;
+        const size_t   need  = total * bpsz;
+        if (need == 0 || need > maxlen) {
+            return 0;
+        }
+
+        if (flt_.size() < total) {
+            flt_.resize(total, 0.0f);
+        }
+
+        // 未挂载采集源时输出静音帧保持时序连续
+        if (!rt_ || rt_->rdtx(s.name, flt_.data(), total) != total) {
+            std::memset(dst, 0, need);
+            return need;
+        }
+
+        encpcm(dst, flt_.data(), total, s.fmt);
+        return need;
+    }
+
+    // 将浮点样本量化为指定协议格式
+    static void encpcm(uint8_t* dst, const float* src, size_t cnt, SmplFmt fmt) {
+        // 按目标位深执行饱和量化与字节序写入
+        switch (fmt) {
+            case SmplFmt::Int8: {
+                auto* d = reinterpret_cast<int8_t*>(dst);
+                for (size_t i = 0; i < cnt; ++i) {
+                    d[i] = static_cast<int8_t>(std::lrint(std::clamp(src[i], -1.0f, 1.0f) * 127.0f));
+                }
+                break;
+            }
+            case SmplFmt::Int16: {
+                auto* d = reinterpret_cast<int16_t*>(dst);
+                for (size_t i = 0; i < cnt; ++i) {
+                    d[i] = static_cast<int16_t>(std::lrint(std::clamp(src[i], -1.0f, 1.0f) * 32767.0f));
+                }
+                break;
+            }
+            case SmplFmt::Int24: {
+                for (size_t i = 0; i < cnt; ++i) {
+                    const int32_t v = static_cast<int32_t>(
+                        std::lrint(std::clamp(src[i], -1.0f, 1.0f) * 8388607.0f));
+                    dst[i * 3 + 0] = static_cast<uint8_t>(v & 0xFF);
+                    dst[i * 3 + 1] = static_cast<uint8_t>((v >> 8) & 0xFF);
+                    dst[i * 3 + 2] = static_cast<uint8_t>((v >> 16) & 0xFF);
+                }
+                break;
+            }
+            case SmplFmt::Int32: {
+                auto* d = reinterpret_cast<int32_t*>(dst);
+                for (size_t i = 0; i < cnt; ++i) {
+                    d[i] = static_cast<int32_t>(std::llrint(
+                        static_cast<double>(std::clamp(src[i], -1.0f, 1.0f)) * 2147483647.0));
+                }
+                break;
+            }
+            case SmplFmt::Float32: {
+                std::memcpy(dst, src, cnt * sizeof(float));
+                break;
+            }
+            default:
+                std::memset(dst, 0, cnt * gtbpsz(fmt));
+                break;
+        }
+    }
+
     // 发射线程主循环
     void txloop() {
-        constexpr uint32_t kSmplsPerPkt = 256;
         std::vector<uint8_t> pktbuf(kMaxPkt);
-        std::vector<uint8_t> zero_pyld(kSmplsPerPkt * 8 * 4, 0);
+        std::vector<uint8_t> pyldbuf;
 
         while (th_run_.load()) {
             const auto now = std::chrono::steady_clock::now();
@@ -196,15 +277,20 @@ private:
                     const uint32_t bpsz = gtbpsz(s->fmt);
                     const size_t pyldsz = kSmplsPerPkt * s->ch * bpsz;
 
-                    if (pyldsz > zero_pyld.size()) {
-                        zero_pyld.resize(pyldsz, 0);
+                    if (pyldbuf.size() < pyldsz) {
+                        pyldbuf.resize(pyldsz, 0);
+                    }
+
+                    // 采集样本并按流格式编码负载
+                    if (gtpyld(*s, pyldbuf.data(), pyldbuf.size()) != pyldsz) {
+                        continue;
                     }
 
                     // 组装并发送报文
                     size_t pktsz = bldpkt(pktbuf.data(), pktbuf.size(),
                                           s->name.c_str(), s->sr, s->ch,
                                           kSmplsPerPkt, s->fmt, s->nu_frm++,
-                                          zero_pyld.data(), pyldsz);
+                                          pyldbuf.data(), pyldsz);
 
                     if (pktsz > 0 && sck_) {
                         ssize_t sent = sck_->sndsck(s->dst_ip.c_str(), s->dst_prt, pktbuf.data(), pktsz);
@@ -239,6 +325,8 @@ private:
     std::mutex                               mtx_;
     std::vector<std::shared_ptr<TxStreamCtx>> strms_;
     std::shared_ptr<UdpSck>                  sck_;
+    std::shared_ptr<RtEngn>                  rt_;
+    std::vector<float>                       flt_;
     std::thread                              tx_th_;
     std::atomic<bool>                        th_run_;
 };

@@ -72,6 +72,8 @@ swiftc -O \
     "$PROJECT_DIR/App/VBANUltimateApp.swift" \
     -lc++ \
     -framework CoreAudio \
+    -framework AudioToolbox \
+    -framework AudioUnit \
     -framework CoreFoundation \
     -framework SwiftUI \
     -framework AppKit \
