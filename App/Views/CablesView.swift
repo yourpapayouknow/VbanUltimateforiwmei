@@ -86,7 +86,7 @@ struct CablesView: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 40)
-        .background(Color.white.opacity(0.03))
+        .background(Theme.cardBg)
     }
 
     // 数据表头
@@ -106,7 +106,7 @@ struct CablesView: View {
         .foregroundColor(Theme.textTertiary)
         .padding(.horizontal, 16)
         .frame(height: 30)
-        .background(Color.black.opacity(0.2))
+        .background(Theme.tableHeaderBg)
     }
 
     // 空状态视图
@@ -190,7 +190,7 @@ struct CablesView: View {
                         .font(.system(size: 11))
                         .foregroundColor(Theme.alertRed.opacity(0.8))
                         .frame(width: 22, height: 22)
-                        .background(Color.white.opacity(0.06))
+                        .background(Theme.btnBg)
                         .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
@@ -312,7 +312,7 @@ struct CableLevelMeterView: View {
 
                     // 声场中轴分隔线
                     Rectangle()
-                        .fill(Color.white.opacity(0.10))
+                        .fill(Theme.centerAxisLine)
                         .frame(width: 1, height: totalMeterHeight)
                         .padding(.horizontal, 5.5)
 
@@ -367,10 +367,10 @@ struct CableLevelMeterView: View {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 1.5)
-                            .fill(Color.black.opacity(0.4))
+                            .fill(Theme.meterSlotBg)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 1.5)
-                                    .stroke(Color.white.opacity(0.06), lineWidth: 0.8)
+                                    .stroke(Theme.meterSlotBorder, lineWidth: 0.8)
                             )
 
                         let lvl = idx < channelLevels.count ? channelLevels[idx] : 0.0
@@ -574,9 +574,6 @@ struct EditCableSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Image(systemName: "pencil")
-                    .font(.system(size: 16))
-                    .foregroundColor(Theme.neonCyan)
                 Text(model.t("修改虚拟音频线缆", "Edit Virtual Audio Cable"))
                     .font(Theme.cnText(14, weight: .bold))
                     .foregroundColor(Theme.textPrimary)

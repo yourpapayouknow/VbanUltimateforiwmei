@@ -53,7 +53,7 @@ struct StreamsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .frame(height: 40)
-            .background(Color.white.opacity(0.03))
+            .background(Theme.cardBg)
 
             Divider().background(Theme.borderSubtle)
 
@@ -88,7 +88,7 @@ struct StreamsView: View {
                         }
                         .padding(.vertical, 32)
                         .padding(.horizontal, 24)
-                        .background(Color.white.opacity(0.025))
+                        .background(Theme.cardBg)
                         .cornerRadius(8)
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
@@ -202,7 +202,7 @@ struct RxStreamCard: View {
                 ParamCapsule(text: "\(strm.bitDepth)bit")
             }
 
-            Divider().background(Color.white.opacity(0.06))
+            Divider().background(Theme.borderSubtle)
 
             // 卡片底栏：远端来源 + 吞吐速率 + 丢包抖动
             HStack(spacing: 8) {
@@ -237,11 +237,11 @@ struct RxStreamCard: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color.white.opacity(0.03))
+        .background(Theme.cardBg)
         .cornerRadius(6)
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(Theme.borderSubtle, lineWidth: 1)
         )
     }
 }
@@ -274,7 +274,7 @@ struct TxStreamCard: View {
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(tx.enabled ? Theme.amberWarn : Theme.meterGreen)
                         .frame(width: 22, height: 22)
-                        .background(Color.white.opacity(0.06))
+                        .background(Theme.btnBg)
                         .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
@@ -286,7 +286,7 @@ struct TxStreamCard: View {
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(Theme.neonCyan)
                         .frame(width: 22, height: 22)
-                        .background(Color.white.opacity(0.06))
+                        .background(Theme.btnBg)
                         .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
@@ -298,33 +298,44 @@ struct TxStreamCard: View {
                         .font(.system(size: 11))
                         .foregroundColor(Theme.alertRed.opacity(0.8))
                         .frame(width: 22, height: 22)
-                        .background(Color.white.opacity(0.06))
+                        .background(Theme.btnBg)
                         .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
-                .help(model.t("删除此发送流通道", "Remove this outgoing stream"))
+                .help(model.t("删除此发送流", "Delete outgoing stream"))
             }
 
-            Divider().background(Color.white.opacity(0.06))
+            Divider().background(Theme.borderSubtle)
 
-            // 卡片底栏：音频源（左）-> 动态居中箭头与真实带宽叠加（中）-> 目标 IP（右）
-            HStack(alignment: .center, spacing: 10) {
-                // 左侧：音频源（紧凑自然对齐，无多余空白）
-                HStack(spacing: 5) {
-                    Image(systemName: "waveform")
-                        .font(.system(size: 11))
-                        .foregroundColor(Theme.amberWarn)
-                    Text(tx.sourceName)
-                        .font(Theme.cnText(12, weight: .semibold))
-                        .foregroundColor(Theme.textPrimary)
-                        .lineLimit(1)
+            // 卡片底栏：双端贯通中轴几何对称数据流向
+            HStack(spacing: 10) {
+                // 最左侧：输入源全称滚动标签
+                RollingLabel(
+                    text: tx.sourceName,
+                    font: Theme.cnText(12, weight: .semibold),
+                    color: Theme.textPrimary,
+                    alignment: .leading
+                )
+                .frame(maxWidth: 130, alignment: .leading)
+                .overlay(alignment: .trailing) {
+                    LinearGradient(
+                        colors: [Color.clear, Theme.cardBg],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(width: 14)
+                    .allowsHitTesting(false)
                 }
+                .help(model.t("音频输入源: \(tx.sourceName)", "Audio Source: \(tx.sourceName)"))
+
+                // 物理连线左侧起点到源标签右边缘的间距（严格对称 10pt）
+                Spacer().frame(width: 0)
 
                 // 正中间：动态贯通横向箭头，真实带宽胶囊绝对居中叠加
                 ZStack {
                     HStack(spacing: 0) {
                         Rectangle()
-                            .fill(tx.enabled ? Theme.neonCyan.opacity(0.4) : Color.white.opacity(0.15))
+                            .fill(tx.enabled ? Theme.neonCyan.opacity(0.5) : Theme.borderSubtle)
                             .frame(height: 1.5)
                         Image(systemName: "arrowtriangle.right.fill")
                             .font(.system(size: 6.5))
@@ -338,11 +349,11 @@ struct TxStreamCard: View {
                         .foregroundColor(tx.enabled ? Theme.meterGreen : Theme.textTertiary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 1.5)
-                        .background(Color(red: 0.14, green: 0.14, blue: 0.15))
+                        .background(Theme.surfaceBg)
                         .cornerRadius(3)
                         .overlay(
                             RoundedRectangle(cornerRadius: 3)
-                                .stroke(tx.enabled ? Theme.meterGreen.opacity(0.35) : Color.white.opacity(0.12), lineWidth: 1)
+                                .stroke(tx.enabled ? Theme.meterGreen.opacity(0.4) : Theme.borderSubtle, lineWidth: 1)
                         )
                 }
                 .frame(maxWidth: .infinity)
@@ -356,11 +367,11 @@ struct TxStreamCard: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color.white.opacity(0.03))
+        .background(Theme.cardBg)
         .cornerRadius(6)
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(Theme.borderSubtle, lineWidth: 1)
         )
         .sheet(isPresented: $showEditSheet) {
             EditTxStreamSheet(model: model, tx: tx, isPresented: $showEditSheet)

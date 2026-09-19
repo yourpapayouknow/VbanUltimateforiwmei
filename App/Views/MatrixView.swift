@@ -69,7 +69,7 @@ struct MatrixView: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 40)
-        .background(Color.white.opacity(0.03))
+        .background(Theme.cardBg)
     }
 
     // 视图切换胶囊
@@ -79,11 +79,11 @@ struct MatrixView: View {
             viewModeItem(mode: .matrix, icon: "square.grid.2x2", tooltip: model.t("矩阵画布视图", "Matrix View"))
         }
         .padding(2)
-        .background(Color.black.opacity(0.35))
+        .background(Theme.capsuleBg)
         .cornerRadius(6)
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(Theme.borderSubtle, lineWidth: 1)
         )
     }
 
@@ -224,7 +224,7 @@ struct MatrixListView: View {
         .foregroundColor(Theme.textTertiary)
         .padding(.horizontal, 16)
         .frame(height: 30)
-        .background(Color.black.opacity(0.2))
+        .background(Theme.tableHeaderBg)
     }
 
     private var emptyState: some View {
@@ -584,13 +584,13 @@ struct MatrixDashedPlusCell: View {
         Button(action: action) {
             ZStack {
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(isHovered ? Theme.neonCyan.opacity(0.08) : Color.white.opacity(0.015))
+                    .fill(isHovered ? Theme.neonCyan.opacity(0.08) : Theme.cardBg)
 
                 RoundedRectangle(cornerRadius: 5)
                     .strokeBorder(
                         style: StrokeStyle(lineWidth: 1.2, dash: [4, 3])
                     )
-                    .foregroundColor(isHovered ? Theme.neonCyan : Color.white.opacity(0.22))
+                    .foregroundColor(isHovered ? Theme.neonCyan : Theme.borderSubtle)
 
                 Text(label)
                     .font(Theme.cnText(14, weight: .bold))
@@ -677,7 +677,7 @@ struct OutputEndpointHeader: View {
                         .font(.system(size: 11))
                         .foregroundColor(Theme.alertRed.opacity(0.8))
                         .frame(width: 22, height: 22)
-                        .background(Color.white.opacity(0.06))
+                        .background(Theme.btnBg)
                         .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
@@ -686,11 +686,11 @@ struct OutputEndpointHeader: View {
         }
         .padding(6)
         .frame(width: width, height: height)
-        .background(Color.white.opacity(0.025))
+        .background(Theme.cardBg)
         .cornerRadius(5)
         .overlay(
             RoundedRectangle(cornerRadius: 5)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(Theme.borderSubtle, lineWidth: 1)
         )
     }
 }
@@ -709,14 +709,14 @@ struct InputEndpointHeader: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text("In \(rowIndex + 1)")
                     .font(Theme.monoDigit(14, weight: .bold))
                     .foregroundColor(Theme.neonCyan)
 
                 RollingLabel(
                     text: slot.name,
-                    font: Theme.cnText(12.5, weight: .semibold),
+                    font: Theme.cnText(12, weight: .medium),
                     color: Theme.textPrimary,
                     alignment: .leading
                 )
@@ -769,7 +769,7 @@ struct InputEndpointHeader: View {
                         .font(.system(size: 11))
                         .foregroundColor(Theme.alertRed.opacity(0.8))
                         .frame(width: 22, height: 22)
-                        .background(Color.white.opacity(0.06))
+                        .background(Theme.btnBg)
                         .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
@@ -778,11 +778,11 @@ struct InputEndpointHeader: View {
         }
         .padding(.horizontal, 10)
         .frame(width: width, height: height)
-        .background(Color.white.opacity(0.025))
+        .background(Theme.cardBg)
         .cornerRadius(5)
         .overlay(
             RoundedRectangle(cornerRadius: 5)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(Theme.borderSubtle, lineWidth: 1)
         )
     }
 }
@@ -810,11 +810,11 @@ struct CrossPointCell: View {
         Button(action: handleCellClick) {
             ZStack {
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(route != nil ? Theme.neonCyan.opacity(0.08) : Color.white.opacity(isHovered ? 0.04 : 0.015))
+                    .fill(route != nil ? Theme.neonCyan.opacity(0.12) : (isHovered ? Theme.cardBg : Theme.cardBg.opacity(0.6)))
 
                 RoundedRectangle(cornerRadius: 5)
                     .strokeBorder(
-                        route != nil ? Theme.neonCyan : Color.white.opacity(isHovered ? 0.18 : 0.08),
+                        route != nil ? Theme.neonCyan : (isHovered ? Theme.neonCyan.opacity(0.4) : Theme.borderSubtle),
                         lineWidth: route != nil ? 2 : 1
                     )
 
@@ -880,7 +880,7 @@ struct InfiniteDotGridCanvas: View {
                 var y: CGFloat = 12
                 while y < size.height {
                     let rect = CGRect(x: x - 1, y: y - 1, width: 2, height: 2)
-                    context.fill(Path(ellipseIn: rect), with: .color(Color.white.opacity(0.18)))
+                    context.fill(Path(ellipseIn: rect), with: .color(Theme.dotGrid))
                     y += step
                 }
                 x += step

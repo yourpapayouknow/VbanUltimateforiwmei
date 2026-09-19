@@ -71,13 +71,13 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(height: 40)
-        .background(Color.white.opacity(0.03))
+        .background(Theme.cardBg)
     }
 
     // 大节分割线
     private var sectionDivider: some View {
         Divider()
-            .background(Color.white.opacity(0.04))
+            .background(Theme.borderSubtle)
             .padding(.bottom, 14)
     }
 
@@ -135,17 +135,17 @@ struct SettingsView: View {
                     }
                 }
                 .padding(2)
-                .background(Color.black.opacity(0.35))
+                .background(Theme.capsuleBg)
                 .cornerRadius(6)
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        .stroke(Theme.borderSubtle, lineWidth: 1)
                 )
                 .help(model.t("切换应用程序界面显示语言", "Switch application display language"))
             }
             .frame(height: 40)
 
-            Divider().background(Color.white.opacity(0.04))
+            Divider().background(Theme.borderSubtle)
 
             // 样式设置行
             HStack(spacing: 16) {
@@ -169,11 +169,11 @@ struct SettingsView: View {
                     }
                 }
                 .padding(2)
-                .background(Color.black.opacity(0.35))
+                .background(Theme.capsuleBg)
                 .cornerRadius(6)
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        .stroke(Theme.borderSubtle, lineWidth: 1)
                 )
                 .help(model.t("切换应用程序外观样式（深色、浅色、跟随系统）", "Switch appearance mode (Dark, Light, System)"))
             }
@@ -237,7 +237,7 @@ struct SettingsView: View {
                         Text(ipCopied ? model.t("已复制", "Copied") : model.t("复制", "Copy"))
                             .font(Theme.cnText(10.5, weight: .semibold))
                             .frame(width: 48, height: 20)
-                            .background(ipCopied ? Theme.meterGreen.opacity(0.2) : Color.white.opacity(0.04))
+                            .background(ipCopied ? Theme.meterGreen.opacity(0.2) : Theme.btnBg)
                             .foregroundColor(ipCopied ? Theme.meterGreen : Theme.neonCyan)
                             .cornerRadius(3)
                             .overlay(
@@ -252,7 +252,7 @@ struct SettingsView: View {
             .frame(height: 40)
             .help(model.t("本机局域网通信地址。当远端设备向本机发送音频流时，须在对端输入此地址。点击可复制至剪贴板。", "Local host IP address on your LAN. When remote devices send audio to this machine, enter this IP on the transmitter. Click to copy."))
 
-            Divider().background(Color.white.opacity(0.04))
+            Divider().background(Theme.borderSubtle)
 
             // 监听端口行
             HStack(spacing: 16) {
@@ -273,7 +273,7 @@ struct SettingsView: View {
             .frame(height: 40)
             .help(model.t("网络监听端口，官方标准为6980。同一网络或同一机器存在多个实例时可自定义端口实现隔离。修改后按回车重新绑定。", "Official standard VBAN UDP port is 6980. Change this to isolate multiple instances on the same host or network. Press Enter to rebind."))
 
-            Divider().background(Color.white.opacity(0.04))
+            Divider().background(Theme.borderSubtle)
 
             // 用户节点名称行
             HStack(spacing: 16) {
@@ -292,7 +292,7 @@ struct SettingsView: View {
             .frame(height: 40)
             .help(model.t("用户节点名称与电台呼号标识，最大长度十六字符。发送流默认使用此标识，方便对端设备识别通信来源。", "Station username and node identifier (max 16 characters). Transmitted streams use this label by default so remote receivers recognize this node."))
 
-            Divider().background(Color.white.opacity(0.04))
+            Divider().background(Theme.borderSubtle)
 
             // 网络质量策略行
             HStack(spacing: 16) {
@@ -313,7 +313,7 @@ struct SettingsView: View {
             .frame(height: 40)
             .help(model.t("网络传输质量预设：\(model.networkQuality.desc(for: model.language))。动态调整抗抖动平滑缓冲深度，避免网络丢包产生爆音。", "Network transmission quality preset: \(model.networkQuality.desc(for: model.language)). Dynamically adjusts jitter buffer depth to prevent underruns."))
 
-            Divider().background(Color.white.opacity(0.04))
+            Divider().background(Theme.borderSubtle)
 
             // 音频缓冲大小行
             HStack(spacing: 16) {
@@ -442,7 +442,7 @@ struct SettingsView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.02))
+        .background(Theme.cardBg)
         .cornerRadius(6)
         .overlay(
             RoundedRectangle(cornerRadius: 6)
@@ -560,7 +560,7 @@ struct SettingsView: View {
                 .font(Theme.cnText(11.5, weight: .semibold))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(Color.white.opacity(0.03))
+                .background(Theme.cardBg)
                 .foregroundColor(Theme.textPrimary)
                 .cornerRadius(4)
                 .overlay(
@@ -642,7 +642,7 @@ struct SettingsView: View {
                     .font(Theme.cnText(10.5, weight: .semibold))
                     .padding(.horizontal, 7)
                     .padding(.vertical, 2.5)
-                    .background(Color.white.opacity(0.04))
+                    .background(Theme.btnBg)
                     .foregroundColor(Theme.neonCyan)
                     .cornerRadius(3)
                     .overlay(
@@ -655,11 +655,11 @@ struct SettingsView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Color.white.opacity(0.015))
+        .background(Theme.cardBg)
         .cornerRadius(4)
         .overlay(
             RoundedRectangle(cornerRadius: 4)
-                .stroke(Color.white.opacity(0.04), lineWidth: 1)
+                .stroke(Theme.borderSubtle, lineWidth: 1)
         )
         .help("\(name) • \(author)\n\(desc)")
     }
@@ -695,7 +695,7 @@ struct SettingsView: View {
                 .font(Theme.cnText(11, weight: .semibold))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3.5)
-                .background(Color.white.opacity(0.04))
+                .background(Theme.btnBg)
                 .foregroundColor(Theme.neonCyan)
                 .cornerRadius(4)
                 .overlay(

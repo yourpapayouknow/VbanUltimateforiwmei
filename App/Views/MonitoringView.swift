@@ -89,7 +89,7 @@ struct MonitoringView: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 40)
-        .background(Color.white.opacity(0.03))
+        .background(Theme.cardBg)
     }
 
     // 遥测数据表头
@@ -129,7 +129,7 @@ struct MonitoringView: View {
         .foregroundColor(Theme.textTertiary)
         .padding(.horizontal, 16)
         .frame(height: 30)
-        .background(Color.black.opacity(0.2))
+        .background(Theme.tableHeaderBg)
     }
 
     // 遥测明细列表
@@ -356,7 +356,11 @@ struct MonitoringView: View {
             .foregroundColor(Theme.textSecondary)
             .padding(.horizontal, 5)
             .padding(.vertical, 2.5)
-            .background(Color.white.opacity(0.08))
+            .background(Theme.cardBg)
             .clipShape(RoundedRectangle(cornerRadius: 3.5, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+                    .stroke(Theme.borderSubtle, lineWidth: 1)
+            )
     }
 }
