@@ -598,7 +598,7 @@ struct SettingsView: View {
                     name: "libASPL",
                     author: "Alexander Gavrilov (gavv)",
                     desc: model.t("现代 C++ CoreAudio AudioServerPlugIn 驱动面向对象框架", "Modern C++ AudioServerPlugIn framework for macOS"),
-                    urlString: "https://github.com/gavv/libASPL"
+                    urlString: "https://github.com/gavv/aspl"
                 )
 
                 creditRow(
@@ -676,9 +676,9 @@ struct SettingsView: View {
                 ))
 
             HStack(spacing: 8) {
-                linkButton(title: model.t("技术文档", "Docs"), urlString: "https://github.com/iwmei/vbanultimate#readme")
-                linkButton(title: model.t("开源仓库", "GitHub"), urlString: "https://github.com/iwmei/vbanultimate")
-                linkButton(title: model.t("反馈支持", "Feedback"), urlString: "https://github.com/iwmei/vbanultimate/issues")
+                linkButton(title: model.t("技术文档", "Docs"), urlString: "https://github.com/yourpapayouknow/VbanUltimateforiwmei#readme")
+                linkButton(title: model.t("开源仓库", "GitHub"), urlString: "https://github.com/yourpapayouknow/VbanUltimateforiwmei")
+                linkButton(title: model.t("反馈支持", "Feedback"), urlString: "https://github.com/yourpapayouknow/VbanUltimateforiwmei/issues")
             }
             .padding(.top, 2)
         }
