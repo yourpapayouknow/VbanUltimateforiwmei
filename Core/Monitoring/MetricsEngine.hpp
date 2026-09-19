@@ -5,6 +5,7 @@
 #include "../Common/Types.hpp"
 #include "StreamStats.hpp"
 #include "../Network/Demuxer.hpp"
+#include "../Network/TxManager.hpp"
 #include "../Audio/CableManager.hpp"
 #include "../Routing/MatrixRouter.hpp"
 
@@ -32,10 +33,17 @@ class MtrcsEngn {
 public:
     MtrcsEngn(std::shared_ptr<StrmDmx> dmx,
               std::shared_ptr<CblMgr> cbl,
-              std::shared_ptr<MtrxRtr> rtr)
+              std::shared_ptr<MtrxRtr> rtr,
+              std::shared_ptr<TxMgr> tx = nullptr)
         : dmx_(std::move(dmx)),
           cbl_(std::move(cbl)),
-          rtr_(std::move(rtr)) {}
+          rtr_(std::move(rtr)),
+          tx_(std::move(tx)) {}
+
+    // 设置发送管理器引用
+    void settx(std::shared_ptr<TxMgr> tx) {
+        tx_ = std::move(tx);
+    }
 
     // 捕获系统全局指标快照
     AppMetrics gtsnap(bool aud_running) {
@@ -63,6 +71,10 @@ public:
                 m.totl_ovr  += s.ovrcnt;
             }
         }
+        if (tx_) {
+            m.tx_snaps = tx_->gtsnaps();
+            m.actv_tx  = tx_->gtactv();
+        }
 
         return m;
     }
@@ -71,6 +83,7 @@ private:
     std::shared_ptr<StrmDmx>  dmx_;
     std::shared_ptr<CblMgr>   cbl_;
     std::shared_ptr<MtrxRtr>  rtr_;
+    std::shared_ptr<TxMgr>    tx_;
 };
 
 } // namespace vban

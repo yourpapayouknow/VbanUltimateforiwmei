@@ -22,7 +22,7 @@ struct HdrRaw {
 static_assert(sizeof(HdrRaw) == 28, "VBAN header must be exactly 28 bytes");
 
 inline constexpr uint32_t kHdrSz   = 28;
-inline constexpr uint32_t kMaxPkt  = 1464;
+inline constexpr uint32_t kMaxPkt  = 16384;
 inline constexpr uint32_t kMaxPyld = kMaxPkt - kHdrSz;
 inline constexpr uint32_t kStrmSz  = 16;
 

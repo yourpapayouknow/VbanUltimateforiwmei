@@ -80,8 +80,12 @@ struct VbanTxStreamDesc: Identifiable, Codable {
     var channels: UInt32
     var bitDepth: UInt32
     var enabled: Bool
-    var kbps: UInt32
-    var packetsPerSec: UInt32
+    var kbps: UInt32 = 0
+    var packetsPerSec: UInt32 = 0
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, sourceName, targetIp, targetPort, sampleRate, channels, bitDepth, enabled
+    }
 
     // 真实的无压缩 PCM 传输比特率（kbps）
     var realKbps: UInt32 {
@@ -361,6 +365,18 @@ final class AppModel: ObservableObject {
 
     func pollMetrics() {
         metrics = bridge.getSnapshot()
+        // 同步发送流实时监控指标
+        let snaps = metrics.txStreams
+        let map = Dictionary(snaps.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+        for i in 0..<txStreams.count {
+            if let sm = map[txStreams[i].name] {
+                txStreams[i].kbps = sm.kbps
+                txStreams[i].packetsPerSec = sm.packetsPerSec
+            } else if !txStreams[i].enabled {
+                txStreams[i].kbps = 0
+                txStreams[i].packetsPerSec = 0
+            }
+        }
         metrics.activeTx = UInt32(txStreams.filter(\.enabled).count)
         isPortConflict = metrics.portConflict
         latestPing = bridge.getLatestPingRecord()
@@ -387,29 +403,39 @@ final class AppModel: ObservableObject {
         } else {
             txStreams = []
         }
+        // 向桥接引擎同步已加载的发送流
+        for s in txStreams {
+            _ = bridge.addTxStream(withId: s.id, name: s.name, source: s.sourceName, targetIp: s.targetIp, port: s.targetPort, sampleRate: s.sampleRate, channels: s.channels, bitDepth: s.bitDepth)
+            _ = bridge.setTxStreamEnabled(s.id, enabled: s.enabled)
+        }
     }
 
+    private var lastSavedTxJson: Data?
     private func saveTxStreams() {
+        // 仅在发送流配置真实发生变化时持久化
         if let data = try? JSONEncoder().encode(txStreams) {
-            UserDefaults.standard.set(data, forKey: "vban_tx_streams")
+            if data != lastSavedTxJson {
+                lastSavedTxJson = data
+                UserDefaults.standard.set(data, forKey: "vban_tx_streams")
+            }
         }
     }
 
     func addTxStream(name: String, sourceName: String, targetIp: String, targetPort: UInt16, sampleRate: UInt32, channels: UInt32, bitDepth: UInt32) {
-        let kbps = sampleRate * channels * bitDepth / 1000
-        let pps: UInt32 = sampleRate / 256
-        let item = VbanTxStreamDesc(id: "tx_\(UUID().uuidString.prefix(8))", name: name, sourceName: sourceName, targetIp: targetIp, targetPort: targetPort, sampleRate: sampleRate, channels: channels, bitDepth: bitDepth, enabled: true, kbps: kbps, packetsPerSec: pps)
+        let sId = "tx_\(UUID().uuidString.prefix(8))"
+        let item = VbanTxStreamDesc(id: sId, name: name, sourceName: sourceName, targetIp: targetIp, targetPort: targetPort, sampleRate: sampleRate, channels: channels, bitDepth: bitDepth, enabled: true)
         txStreams.append(item)
+        _ = bridge.addTxStream(withId: sId, name: name, source: sourceName, targetIp: targetIp, port: targetPort, sampleRate: sampleRate, channels: channels, bitDepth: bitDepth)
+        _ = bridge.setTxStreamEnabled(sId, enabled: true)
     }
 
     func removeTxStream(id: String) {
         txStreams.removeAll { $0.id == id }
+        _ = bridge.removeTxStream(withId: id)
     }
 
     func updateTxStream(id: String, name: String, sourceName: String, targetIp: String, targetPort: UInt16, sampleRate: UInt32, channels: UInt32, bitDepth: UInt32) {
         if let idx = txStreams.firstIndex(where: { $0.id == id }) {
-            let kbps = (sampleRate * channels * bitDepth) / 1000
-            let pps: UInt32 = sampleRate / 256
             txStreams[idx].name = name
             txStreams[idx].sourceName = sourceName
             txStreams[idx].targetIp = targetIp
@@ -417,15 +443,15 @@ final class AppModel: ObservableObject {
             txStreams[idx].sampleRate = sampleRate
             txStreams[idx].channels = channels
             txStreams[idx].bitDepth = bitDepth
-            txStreams[idx].kbps = kbps
-            txStreams[idx].packetsPerSec = pps
-            saveTxStreams()
+            _ = bridge.addTxStream(withId: id, name: name, source: sourceName, targetIp: targetIp, port: targetPort, sampleRate: sampleRate, channels: channels, bitDepth: bitDepth)
+            _ = bridge.setTxStreamEnabled(id, enabled: txStreams[idx].enabled)
         }
     }
 
     func toggleTxStream(id: String) {
         if let idx = txStreams.firstIndex(where: { $0.id == id }) {
             txStreams[idx].enabled.toggle()
+            _ = bridge.setTxStreamEnabled(id, enabled: txStreams[idx].enabled)
         }
     }
 

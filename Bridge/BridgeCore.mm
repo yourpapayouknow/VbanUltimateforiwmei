@@ -10,6 +10,7 @@
 #include "../Core/Audio/DeviceCatalog.hpp"
 #include "../Core/Audio/CableManager.hpp"
 #include "../Core/Routing/MatrixRouter.hpp"
+#include "../Core/Network/TxManager.hpp"
 #include "../Core/Monitoring/MetricsEngine.hpp"
 #include <thread>
 #include <atomic>
@@ -43,6 +44,7 @@
     std::shared_ptr<vban::StrmDmx>    dmx_;
     std::shared_ptr<vban::CblMgr>     cbl_;
     std::shared_ptr<vban::MtrxRtr>    rtr_;
+    std::shared_ptr<vban::TxMgr>      tx_mgr_;
     std::shared_ptr<vban::MtrcsEngn>  mtr_;
     std::thread                       rx_th_;
     std::atomic<bool>                 th_run_;
@@ -74,7 +76,8 @@
         dmx_           = std::make_shared<vban::StrmDmx>();
         cbl_           = std::make_shared<vban::CblMgr>();
         rtr_           = std::make_shared<vban::MtrxRtr>();
-        mtr_           = std::make_shared<vban::MtrcsEngn>(dmx_, cbl_, rtr_);
+        tx_mgr_        = std::make_shared<vban::TxMgr>();
+        mtr_           = std::make_shared<vban::MtrcsEngn>(dmx_, cbl_, rtr_, tx_mgr_);
         th_run_           = false;
         is_run_           = false;
         port_conflict_    = false;
@@ -175,6 +178,7 @@
 
     th_run_.store(true);
     is_run_.store(true);
+    tx_mgr_->strtall();
 
     auto sck_ptr = sck_;
     auto dmx_ptr = dmx_;
@@ -253,6 +257,7 @@
     // 停止网络与流分发线程
     if (!is_run_.load()) return;
 
+    tx_mgr_->stpall();
     th_run_.store(false);
     if (rx_th_.joinable()) {
         rx_th_.join();
@@ -353,6 +358,26 @@
     rtr_->tglrout([rId UTF8String], en);
 }
 
+- (BOOL)addTxStreamWithId:(NSString *)sId name:(NSString *)name source:(NSString *)src targetIp:(NSString *)ip port:(uint16_t)port sampleRate:(uint32_t)sr channels:(uint32_t)ch bitDepth:(uint32_t)bd {
+    // 注册或更新发送流配置
+    return tx_mgr_->addstrm([sId UTF8String], [name UTF8String], [src UTF8String], [ip UTF8String], port, sr, ch, bd);
+}
+
+- (BOOL)removeTxStreamWithId:(NSString *)sId {
+    // 移除发送流
+    return tx_mgr_->rmvstrm([sId UTF8String]);
+}
+
+- (BOOL)setTxStreamEnabled:(NSString *)sId enabled:(BOOL)en {
+    // 设置发送流启停状态
+    return tx_mgr_->tglstrm([sId UTF8String], en);
+}
+
+- (void)clearTxStreams {
+    // 清空全部发送流
+    tx_mgr_->clrstrms();
+}
+
 - (VbanAppMetric *)getSnapshot {
     // 获取全局快照数据供UI刷新
     auto snap = mtr_->gtsnap(is_run_.load());
@@ -411,6 +436,48 @@
         [strms addObject:sm];
     }
     m.rxStreams = strms;
+
+    NSMutableArray<VbanStrmMetric *> *tx_strms = [NSMutableArray array];
+    for (const auto& s : snap.tx_snaps) {
+        VbanStrmMetric *sm = [[VbanStrmMetric alloc] init];
+        sm.name            = [NSString stringWithUTF8String:s.strm];
+        sm.srcIp           = [NSString stringWithUTF8String:s.srcip];
+        sm.srcPort         = s.srcprt;
+        sm.sampleRate      = s.sr;
+        sm.channels        = s.ch;
+        uint32_t bdepth = 16;
+        switch (s.fmt) {
+            case vban::SmplFmt::Int8:    bdepth = 8; break;
+            case vban::SmplFmt::Int16:   bdepth = 16; break;
+            case vban::SmplFmt::Int24:   bdepth = 24; break;
+            case vban::SmplFmt::Int32:   bdepth = 32; break;
+            case vban::SmplFmt::Float32: bdepth = 32; break;
+            case vban::SmplFmt::Float64: bdepth = 64; break;
+            case vban::SmplFmt::Int12:   bdepth = 12; break;
+            case vban::SmplFmt::Int10:   bdepth = 10; break;
+            default:                     bdepth = 16; break;
+        }
+        sm.bitDepth        = bdepth;
+        sm.format          = (s.fmt == vban::SmplFmt::Float32 || s.fmt == vban::SmplFmt::Float64)
+                             ? [NSString stringWithFormat:@"Float %ubit", bdepth]
+                             : [NSString stringWithFormat:@"PCM %ubit", bdepth];
+        sm.status          = (s.stt == vban::StrmStt::Active) ? @"Active" : @"Offline";
+        sm.packetCount     = s.pktcnt;
+        sm.frameCount      = s.frmcnt;
+        sm.lostCount       = s.lostcnt;
+        sm.duplicateCount  = s.dupcnt;
+        sm.orderErrorCount = s.ordrcnt;
+        sm.underrunCount   = s.undrcnt;
+        sm.overloadCount   = s.ovrcnt;
+        sm.corruptCount    = s.crptcnt;
+        sm.errorCount      = s.errcnt;
+        sm.packetsPerSec   = s.pkts;
+        sm.kbps            = s.kbps;
+        sm.jitterMs        = s.jtr_ms;
+        [tx_strms addObject:sm];
+    }
+    m.txStreams = tx_strms;
+
     return m;
 }
 

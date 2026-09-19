@@ -45,6 +45,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL portConflict;
 @property (nonatomic, assign) uint16_t boundPort;
 @property (nonatomic, strong) NSArray<VbanStrmMetric *> *rxStreams;
+@property (nonatomic, strong) NSArray<VbanStrmMetric *> *txStreams;
 @end
 
 // 虚拟线缆数据结构
@@ -139,6 +140,12 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)addRouteWithId:(NSString *)rId srcId:(NSString *)sId srcName:(NSString *)sName dstId:(NSString *)dId dstName:(NSString *)dName gain:(float)gain;
 - (BOOL)removeRouteWithId:(NSString *)rId;
 - (void)toggleRouteWithId:(NSString *)rId enabled:(BOOL)en;
+
+// 发送流管理
+- (BOOL)addTxStreamWithId:(NSString *)sId name:(NSString *)name source:(NSString *)src targetIp:(NSString *)ip port:(uint16_t)port sampleRate:(uint32_t)sr channels:(uint32_t)ch bitDepth:(uint32_t)bd;
+- (BOOL)removeTxStreamWithId:(NSString *)sId;
+- (BOOL)setTxStreamEnabled:(NSString *)sId enabled:(BOOL)en;
+- (void)clearTxStreams;
 
 // 全局指标快照 (500ms 轮询)
 - (VbanAppMetric *)getSnapshot;

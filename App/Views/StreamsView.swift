@@ -344,17 +344,31 @@ struct TxStreamCard: View {
                     }
 
                     // 带宽胶囊叠加在横线上（在可用连接段绝对正中心）
-                    Text(tx.enabled ? "\(tx.realKbps) kbps" : model.t("已暂停", "Paused"))
-                        .font(Theme.monoDigit(11, weight: .bold))
-                        .foregroundColor(tx.enabled ? Theme.meterGreen : Theme.textTertiary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1.5)
-                        .background(Theme.surfaceBg)
-                        .cornerRadius(3)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 3)
-                                .stroke(tx.enabled ? Theme.meterGreen.opacity(0.4) : Theme.borderSubtle, lineWidth: 1)
-                        )
+                    HStack(spacing: 3) {
+                        if tx.enabled {
+                            let dispKbps = tx.kbps > 0 ? tx.kbps : tx.realKbps
+                            Text("\(dispKbps) kbps")
+                                .font(Theme.monoDigit(11, weight: .bold))
+                                .foregroundColor(Theme.meterGreen)
+                            if tx.packetsPerSec > 0 {
+                                Text("(\(tx.packetsPerSec)p/s)")
+                                    .font(Theme.monoDigit(10, weight: .semibold))
+                                    .foregroundColor(Theme.neonCyan)
+                            }
+                        } else {
+                            Text(model.t("已暂停", "Paused"))
+                                .font(Theme.monoDigit(11, weight: .bold))
+                                .foregroundColor(Theme.textTertiary)
+                        }
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1.5)
+                    .background(Theme.surfaceBg)
+                    .cornerRadius(3)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 3)
+                            .stroke(tx.enabled ? Theme.meterGreen.opacity(0.4) : Theme.borderSubtle, lineWidth: 1)
+                    )
                 }
                 .frame(maxWidth: .infinity)
 
