@@ -147,6 +147,7 @@ public:
 
 private:
     // 单侧指派条目
+        // 单侧指派条目
     struct AsgnEnt {
         std::string                     dev;
         bool                            en{false};

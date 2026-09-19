@@ -22,9 +22,14 @@ struct HdrRaw {
 static_assert(sizeof(HdrRaw) == 28, "VBAN header must be exactly 28 bytes");
 
 inline constexpr uint32_t kHdrSz   = 28;
-inline constexpr uint32_t kMaxPkt  = 16384;
+
+// 官方 VBAN_PROTOCOL_MAX_SIZE：整包上限须适配以太网 MTU，超出将被 IP 分片
+inline constexpr uint32_t kMaxPkt  = 1464;
 inline constexpr uint32_t kMaxPyld = kMaxPkt - kHdrSz;
 inline constexpr uint32_t kStrmSz  = 16;
+
+// 官方 VBAN_SAMPLES_MAX_NB：单包采样帧数上限
+inline constexpr uint32_t kMaxSmpls = 256;
 
 // 结构化解析结果
 struct PktInf {
