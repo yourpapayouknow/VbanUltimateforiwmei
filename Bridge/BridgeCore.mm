@@ -10,12 +10,15 @@
 #include "../Core/Audio/DeviceCatalog.hpp"
 #include "../Core/Audio/CableManager.hpp"
 #include "../Core/Routing/MatrixRouter.hpp"
-#include "../Core/Routing/RouteEngine.hpp"
-#include "../Core/Audio/StreamEngine.hpp"
+#include "../Core/Audio/OfficialAudio.hpp"
+#include "../Core/Audio/OfficialStream.hpp"
 #include "../Core/Network/TxManager.hpp"
 #include "../Core/Monitoring/MetricsEngine.hpp"
 #include <thread>
 #include <atomic>
+#include <map>
+#include <mutex>
+#include <string>
 #include <ifaddrs.h>
 #include <arpa/inet.h>
 #include <net/if.h>
@@ -46,8 +49,11 @@
     std::shared_ptr<vban::StrmDmx>    dmx_;
     std::shared_ptr<vban::CblMgr>     cbl_;
     std::shared_ptr<vban::MtrxRtr>    rtr_;
-    std::shared_ptr<vban::RtEngn>     rt_;
-    std::shared_ptr<vban::StrmEngn>   seng_;
+    std::map<std::string, std::shared_ptr<vban::OffAud>>   rx_aud_;
+    std::map<std::string, std::shared_ptr<vban::OffRcvr>>  rx_rcv_;
+    std::map<std::string, std::shared_ptr<vban::OffAud>>   tx_aud_;
+    std::map<std::string, std::shared_ptr<vban::OffEmitr>> tx_emt_;
+    std::mutex                                             rx_mtx_;
     std::shared_ptr<vban::TxMgr>      tx_mgr_;
     std::shared_ptr<vban::MtrcsEngn>  mtr_;
     std::thread                       rx_th_;
@@ -68,6 +74,9 @@
 
 // 应用发送流采集设备绑定
 - (void)hndltx:(NSDictionary<NSString *, NSString *> *)map;
+
+// 将收到的报文送入对应接收流的官方 receptor
+- (void)feedPkt:(const uint8_t *)buf len:(size_t)len;
 
 // 按线缆标识检索对应音频设备
 - (nullable VbanAudioDevDesc *)devByCableId:(NSString *)cableId;
@@ -94,10 +103,7 @@
         dmx_           = std::make_shared<vban::StrmDmx>();
         cbl_           = std::make_shared<vban::CblMgr>();
         rtr_           = std::make_shared<vban::MtrxRtr>();
-        rt_            = std::make_shared<vban::RtEngn>();
-        seng_          = std::make_shared<vban::StrmEngn>(rt_);
         tx_mgr_        = std::make_shared<vban::TxMgr>();
-        tx_mgr_->setrt(rt_);
         mtr_           = std::make_shared<vban::MtrcsEngn>(dmx_, cbl_, rtr_, tx_mgr_);
         th_run_           = false;
         is_run_           = false;
@@ -105,7 +111,6 @@
         bound_port_       = 6980;
         net_qlt_          = 1;
         buffering_frames_ = 128;
-        seng_->setqlt(net_qlt_.load());
         rx_active_        = [NSMutableSet set];
         tx_active_        = [NSMutableSet set];
     }
@@ -153,13 +158,6 @@
     // 设置全局网络质量档位
     if (quality > 4) quality = 1;
     net_qlt_.store(quality);
-    if (dmx_) {
-        dmx_->setqlt(static_cast<vban::NetQlt>(quality));
-    }
-    // 档位同时用于回放起播预填深度
-    if (seng_) {
-        seng_->setqlt(quality);
-    }
 }
 
 - (uint8_t)networkQuality {
@@ -208,23 +206,19 @@
     is_run_.store(true);
     tx_mgr_->strtall();
 
-    // 接收样本直送回放缓冲
-    auto rt_ptr = rt_;
-    dmx_->setaudcb([rt_ptr](const char* strm, const float* smpls, size_t cnt, uint32_t) {
-        rt_ptr->wrrx(strm, smpls, cnt);
-    });
-
     auto sck_ptr = sck_;
     auto dmx_ptr = dmx_;
     std::atomic<bool>* run_flag = &th_run_;
+    VbanBridge *bridge_ptr = self;
 
-    rx_th_ = std::thread([sck_ptr, dmx_ptr, run_flag]() {
+    rx_th_ = std::thread([sck_ptr, dmx_ptr, run_flag, bridge_ptr]() {
         uint8_t buf[2048];
         char sip[32];
         uint16_t sprt = 0;
         while (run_flag->load()) {
             ssize_t n = sck_ptr->rcvsck(buf, sizeof(buf), sip, &sprt);
             if (n > 0) {
+                [bridge_ptr feedPkt:buf len:(size_t)n];
                 dmx_ptr->dmxpkt(buf, n, sip, sprt);
             } else {
                 if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
@@ -445,52 +439,49 @@
 
 // 应用接收流回放设备绑定
 - (void)hndlrx:(NSDictionary<NSString *, NSString *> *)map {
-    // 停止已解除绑定的接收流并启动新增绑定
-    for (NSString *key in rx_active_) {
-        if (map[key] == nil) {
-            seng_->stprx();
-            rt_->clrrxdev([key UTF8String]);
+    // 对照官方 receptor：为每条接收流建立设备后端
+    std::lock_guard<std::mutex> lk(rx_mtx_);
+
+    for (auto it = rx_aud_.begin(); it != rx_aud_.end();) {
+        NSString *k = [NSString stringWithUTF8String:it->first.c_str()];
+        if (map[k] == nil) {
+            rx_rcv_.erase(it->first);
+            it = rx_aud_.erase(it);
+        } else {
+            ++it;
         }
     }
     [rx_active_ removeAllObjects];
 
     for (NSString *strm in map) {
-        NSString *devUid = map[strm];
-        VbanAudioDevDesc *dev = [self devByCableId:devUid];
+        NSString *cableId = map[strm];
+        VbanAudioDevDesc *dev = [self devByCableId:cableId];
         if (!dev || dev.outChannels == 0) continue;
 
-        if (seng_->gtrxrun() && rx_cur_ && [rx_cur_ isEqualToString:strm]) {
+        const std::string key = [strm UTF8String];
+        if (rx_aud_.count(key)) {
             [rx_active_ addObject:strm];
             continue;
         }
 
-        vban::DevInf inf{};
-        inf.id     = dev.devId;
-        inf.uid    = [dev.uid UTF8String];
-        inf.name   = [dev.name UTF8String];
-        inf.inchs  = dev.inChannels;
-        inf.outchs = dev.outChannels;
-        inf.sr     = dev.sampleRate;
-
-        // 流规格取自接收流快照，规格未变则引擎内部早退不重配
-        vban::StrmCfg cfg = [self rxcfgOfStream:strm];
-        if (!cfg.ch || !cfg.sr) continue;
-
-        rt_->rstbuf([strm UTF8String], cfg.ch, cfg.sr);
-        if (seng_->strtrx(inf, [strm UTF8String], cfg)) {
-            rx_cur_ = strm;
-            [rx_active_ addObject:strm];
-        }
+        auto aud = std::make_shared<vban::OffAud>();
+        aud->init(vban::AudDir::Out, dev.devId);
+        rx_rcv_[key] = std::make_shared<vban::OffRcvr>(aud, key);
+        rx_aud_[key] = aud;
+        [rx_active_ addObject:strm];
     }
 }
 
 // 应用发送流采集设备绑定
 - (void)hndltx:(NSDictionary<NSString *, NSString *> *)map {
-    // 停止已解除绑定的发送流并启动新增绑定
-    for (NSString *key in tx_active_) {
-        if (map[key] == nil) {
-            seng_->stptx();
-            rt_->settxdev([key UTF8String], "", 0, 0);
+    // 对照官方 emitter：为每条发送流建立采集后端
+    for (auto it = tx_aud_.begin(); it != tx_aud_.end();) {
+        NSString *k = [NSString stringWithUTF8String:it->first.c_str()];
+        if (map[k] == nil) {
+            tx_emt_.erase(it->first);
+            it = tx_aud_.erase(it);
+        } else {
+            ++it;
         }
     }
     [tx_active_ removeAllObjects];
@@ -500,59 +491,48 @@
         VbanAudioDevDesc *dev = [self devByCableId:cableId];
         if (!dev || dev.inChannels == 0) continue;
 
-        if (seng_->gttxrun() && tx_cur_ && [tx_cur_ isEqualToString:strm]) {
+        const std::string key = [strm UTF8String];
+        if (tx_aud_.count(key)) {
             [tx_active_ addObject:strm];
             continue;
         }
 
-        vban::DevInf inf{};
-        inf.id     = dev.devId;
-        inf.uid    = [dev.uid UTF8String];
-        inf.name   = [dev.name UTF8String];
-        inf.inchs  = dev.inChannels;
-        inf.outchs = dev.outChannels;
-        inf.sr     = dev.sampleRate;
-
-        // 流规格取自发送流配置，规格未变则引擎内部早退不重配
         vban::StrmCfg cfg = [self txcfgOfStream:strm];
         if (!cfg.ch || !cfg.sr) continue;
-        inf.sr = cfg.sr;
 
-        rt_->settxdev([strm UTF8String], [dev.uid UTF8String], cfg.ch, cfg.sr);
-        if (seng_->strttx(inf, [strm UTF8String], cfg)) {
-            tx_cur_ = strm;
-            [tx_active_ addObject:strm];
-        }
+        auto aud = std::make_shared<vban::OffAud>();
+        aud->init(vban::AudDir::In, dev.devId);
+        aud->setcfg(cfg);
+        tx_emt_[key] = std::make_shared<vban::OffEmitr>(aud, key);
+        tx_aud_[key] = aud;
+        [tx_active_ addObject:strm];
     }
 }
 
-// 查询接收流的完整规格
-- (vban::StrmCfg)rxcfgOfStream:(NSString *)strm {
-    // 从接收流快照中取出声道、采样率与采样格式
-    vban::StrmCfg cfg{};
-    auto snap = mtr_->gtsnap(is_run_.load());
-    const std::string want = [strm UTF8String];
-    for (const auto &s : snap.rx_snaps) {
-        if (want == s.strm) {
-            cfg.ch  = s.ch;
-            cfg.sr  = s.sr;
-            cfg.fmt = s.fmt;
-            break;
-        }
+// 将收到的报文送入对应接收流的官方 receptor
+- (void)feedPkt:(const uint8_t *)buf len:(size_t)len {
+    // 对照官方 receptor 循环体：校验通过即写入设备
+    std::lock_guard<std::mutex> lk(rx_mtx_);
+    for (auto &kv : rx_rcv_) {
+        if (kv.second) kv.second->onpkt(buf, len);
     }
-    return cfg;
 }
 
 // 查询发送流的完整规格
 - (vban::StrmCfg)txcfgOfStream:(NSString *)strm {
-    // 从发送流配置中取出声道、采样率与采样格式
+    // 从发送流配置中取出声道、采样率与采样位深
     vban::StrmCfg cfg{};
     const std::string want = [strm UTF8String];
     for (const auto &s : tx_mgr_->gtsnaps()) {
         if (want == s.strm) {
             cfg.ch  = s.ch;
             cfg.sr  = s.sr;
-            cfg.fmt = s.fmt;
+            cfg.bit = s.fmt == vban::SmplFmt::Int16 ? 1
+                    : s.fmt == vban::SmplFmt::Int24 ? 2
+                    : s.fmt == vban::SmplFmt::Int32 ? 3
+                    : s.fmt == vban::SmplFmt::Float32 ? 4
+                    : s.fmt == vban::SmplFmt::Float64 ? 5
+                    : s.fmt == vban::SmplFmt::Int8 ? 0 : 1;
             break;
         }
     }

@@ -6,7 +6,6 @@
 #include "../VBAN/Protocol.hpp"
 #include "../VBAN/Packetizer.hpp"
 #include "../Monitoring/StreamStats.hpp"
-#include "../Routing/RouteEngine.hpp"
 #include "UdpSocket.hpp"
 #include <thread>
 #include <atomic>
@@ -136,12 +135,6 @@ public:
         }
     }
 
-    // 绑定流指派引擎
-    void setrt(std::shared_ptr<RtEngn> rt) {
-        // 挂载采集样本来源引擎
-        rt_ = std::move(rt);
-    }
-
     // 获取发送流指标快照
     std::vector<StrmSnap> gtsnaps() {
         std::lock_guard<std::mutex> lock(mtx_);
@@ -204,12 +197,8 @@ private:
             flt_.resize(total, 0.0f);
         }
 
-        // 未挂载采集源时输出静音帧保持时序连续
-        if (!rt_ || rt_->rdtx(s.name, flt_.data(), total) != total) {
-            std::memset(dst, 0, need);
-            return need;
-        }
-
+        // 采集源由官方 emitter 直接驱动，此处输出静音帧保持时序连续
+        std::memset(flt_.data(), 0, total * sizeof(float));
         encpcm(dst, flt_.data(), total, s.fmt);
         return need;
     }
@@ -325,7 +314,6 @@ private:
     std::mutex                               mtx_;
     std::vector<std::shared_ptr<TxStreamCtx>> strms_;
     std::shared_ptr<UdpSck>                  sck_;
-    std::shared_ptr<RtEngn>                  rt_;
     std::vector<float>                       flt_;
     std::thread                              tx_th_;
     std::atomic<bool>                        th_run_;

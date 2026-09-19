@@ -5,7 +5,6 @@
 #include "../Common/Types.hpp"
 #include "../VBAN/Parser.hpp"
 #include "../Monitoring/StreamStats.hpp"
-#include "JitterBuffer.hpp"
 #include "PingManager.hpp"
 
 namespace vban {
@@ -22,7 +21,6 @@ struct StrmCtx {
     std::string             req_ip;
     PktCb                   cb;
     StrmStts                stts;
-    std::shared_ptr<JtrBuf> jtr;
     bool                    en{true};
 };
 
@@ -73,12 +71,6 @@ public:
         auto_dsc_ = en;
     }
 
-    // 设置音频样本提取回调
-    void setaudcb(AudCb cb) {
-        // 注册接收样本提取回调
-        aud_cb_ = std::move(cb);
-    }
-
     // 分分解码并分发单个网络数据包
     bool dmxpkt(const uint8_t* dat, size_t len, const char* sip, uint16_t sprt) {
         // 服务协议探测报文优先分发
@@ -126,45 +118,12 @@ public:
         // 更新统计指标
         target->stts.updpkt(inf, sip, sprt);
 
-        // 提取接收样本供流回放通路使用
-        if (aud_cb_) {
-            toflt(inf);
-            if (flt_cnt_ > 0) {
-                aud_cb_(inf.strm, flt_.data(), flt_cnt_, inf.ch);
-            }
-        }
-
-        // 压入抗网络抖动平滑缓冲
-        if (!target->jtr) {
-            target->jtr = std::make_shared<JtrBuf>(inf.ch, inf.sr, def_qlt_);
-        }
-        if (!target->jtr->pshpkt(inf)) {
-            target->stts.updcrpt();
-        }
-
         // 派发回调
         if (target->cb) {
             target->cb(inf, sip, sprt);
         }
 
         return true;
-    }
-
-    // 设置全局网络质量预设
-    void setqlt(NetQlt q) {
-        std::lock_guard<std::mutex> lock(mtx_);
-        def_qlt_ = q;
-        for (auto& pair : strms_) {
-            if (pair.second->jtr) {
-                pair.second->jtr->setqlt(q);
-            }
-        }
-    }
-
-    // 获取当前默认网络质量预设
-    NetQlt gtqlt() const {
-        std::lock_guard<std::mutex> lock(mtx_);
-        return def_qlt_;
     }
 
     // 定时轮询检查超时离线流
@@ -184,10 +143,6 @@ public:
         snaps.reserve(strms_.size());
         for (const auto& pair : strms_) {
             auto sn = pair.second->stts.gtsnap();
-            if (pair.second->jtr) {
-                sn.undrcnt = pair.second->jtr->gtundr();
-                sn.ovrcnt  = pair.second->jtr->gtovr();
-            }
             snaps.push_back(sn);
         }
         return snaps;
@@ -216,63 +171,11 @@ public:
     }
 
 private:
-    // 将整型负载归一化转换为单精度浮点样本
-    void toflt(const PktInf& inf) {
-        // 按采样格式解包负载为浮点样本
-        const uint32_t total = inf.smpls * inf.ch;
-        flt_cnt_ = 0;
-        if (total == 0 || total > kMaxPyld / 2 || !inf.pyld) {
-            return;
-        }
-        if (flt_.size() < total) {
-            flt_.resize(total, 0.0f);
-        }
-
-        switch (inf.fmt) {
-            case SmplFmt::Int16: {
-                const auto* s = reinterpret_cast<const int16_t*>(inf.pyld);
-                for (uint32_t i = 0; i < total; ++i) flt_[i] = s[i] / 32768.0f;
-                break;
-            }
-            case SmplFmt::Float32: {
-                std::memcpy(flt_.data(), inf.pyld, total * sizeof(float));
-                break;
-            }
-            case SmplFmt::Int24: {
-                const auto* b = inf.pyld;
-                for (uint32_t i = 0; i < total; ++i) {
-                    const int32_t v = (static_cast<int32_t>(b[i * 3 + 0])) |
-                                      (static_cast<int32_t>(b[i * 3 + 1]) << 8) |
-                                      (static_cast<int32_t>(static_cast<int8_t>(b[i * 3 + 2])) << 16);
-                    flt_[i] = v / 8388608.0f;
-                }
-                break;
-            }
-            case SmplFmt::Int32: {
-                const auto* s = reinterpret_cast<const int32_t*>(inf.pyld);
-                for (uint32_t i = 0; i < total; ++i) flt_[i] = s[i] / 2147483648.0f;
-                break;
-            }
-            case SmplFmt::Int8: {
-                const auto* s = reinterpret_cast<const int8_t*>(inf.pyld);
-                for (uint32_t i = 0; i < total; ++i) flt_[i] = s[i] / 128.0f;
-                break;
-            }
-            default:
-                return;
-        }
-        flt_cnt_ = total;
-    }
-
     mutable std::mutex mtx_;
     std::unordered_map<std::string, std::shared_ptr<StrmCtx>> strms_;
     std::atomic<bool> auto_dsc_;
-    NetQlt            def_qlt_{NetQlt::Fast};
     std::atomic<uint64_t> crptcnt_{0};
     std::atomic<uint64_t> errcnt_{0};
-    AudCb                 aud_cb_;
-    std::vector<float>    flt_;
-    size_t                flt_cnt_{0};
 };
 
 } // namespace vban
