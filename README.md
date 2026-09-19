@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="Resources/AppIcon.png" alt="VBAN Ultimate Icon" width="128" height="128" />
+<img src="Resources/AppIcon.png" alt="VBAN Ultimate Icon" width="108" height="108" />
 
 # VBAN Ultimate for macOS
 
 ![Project badge](assets/readme-badge.png)
 
-**专为 Apple Silicon 架构量身打造的原生轻量、超低延迟广播级 VBAN 音频路由矩阵与 CoreAudio 动态虚拟音频线缆工作台**
+*专为 Apple Silicon 量身打造的原生轻量、超低延迟广播级 VBAN 音频路由矩阵与 CoreAudio 虚拟音频线缆工作台*
 
 [English](README_EN.md) · [简体中文](README.md)
 
@@ -14,135 +14,129 @@
 [![Architecture](https://img.shields.io/badge/Arch-arm64%20(Apple%20Silicon)-orange.svg?style=flat-square)](https://apple.com)
 [![Engine](https://img.shields.io/badge/Engine-C%2B%2B20%20RT--Safe-green.svg?style=flat-square)](Core/)
 [![UI](https://img.shields.io/badge/UI-SwiftUI%20Native-cyan.svg?style=flat-square)](App/)
-[![License](https://img.shields.io/badge/License-MIT-purple.svg?style=flat-square)](LICENSE)
 
 </div>
 
 ---
 
-## 📖 项目概览 (Overview)
-
-**VBAN Ultimate** 是一套基础设施级的专业音频工作台，深度贯通 **VBAN (VB-Audio Network)** 网络音频流协议与 **macOS CoreAudio HAL** 系统硬件抽象层。项目专为低延迟、高保真局域网音频分发设计，剔除了传统宿主软件（DAW）的臃肿堆叠，专注于三大核心支柱：
-
-1. **单端口多路音频流复用**：遵循 VBAN 官方 UDP 6980 标准端口，单套接字实现多路网络音频流的全双工零拷贝解复用与并发发送。
-2. **广播级 4x4 点阵路由矩阵**：严格遵循专业路由器（Audio Router / Matrix Switcher）逻辑，单目标输出源互斥切换，输入信号支持广播级一对多分发（Fan-out）。
-3. **CoreAudio HAL 原生虚拟音频线缆**：自主研发的系统级 `AudioServerPlugIn` 驱动，在系统原生“音频与MIDI设置”中完全可见，热增删配置无需重启音频守护进程 `coreaudiod`。
-4. **全链路微秒级抖动诊断**：毫秒与微秒级网络抖动吸收、无锁 SPSC 环形缓冲、丢包率及真实吞吐带宽实时监控。
+**VBAN Ultimate** 是专为 macOS 打造的高性能广播级网络音频与虚拟音频线缆工作台。它在单个标准 UDP 6980 套接字上实现了多路 VBAN 网络音频流的全双工零拷贝解复用与并发发送，并与 macOS CoreAudio 系统硬件抽象层深度打通，提供动态可热配置的系统级虚拟声卡与广播级路由矩阵。
 
 ---
 
-## 🏛️ 信号链路与系统架构
+## 快速开始
 
-```mermaid
-graph TD
-    subgraph LAN [局域网网络音频流 (VBAN)]
-        PC1[工作站 A 发送端] -->|UDP:6980| SOCK[单 UDP 监听套接字]
-        PC2[工作站 B 发送端] -->|UDP:6980| SOCK
-    end
+如果你正在使用具备终端执行能力的 AI 编程助手（如 Antigravity、Claude Code、Cursor 或 Codex），你可以直接向它发送以下提示词：
 
-    subgraph Core [C++20 RT-Safe 音频内核]
-        SOCK --> DMX[流解复用器 Demuxer]
-        DMX --> JB[自适应微抖动吸收器 JitterBuffer]
-        JB --> RB[无锁 SPSC 环形缓冲区 RingBuffer]
-        RB --> RTR[4x4 点阵路由矩阵 MatrixRouter]
-    end
-
-    subgraph macOS [macOS CoreAudio 系统音频]
-        RTR --> SPK[物理扬声器 / 耳机输出]
-        RTR --> DRV[VBANUltimateAudio.driver]
-        DRV --> CBL1[虚拟音频线缆 Cable A]
-        DRV --> CBL2[虚拟音频线缆 Cable B]
-        CBL1 --> OBS[OBS Studio / Logic Pro / 协作会议]
-    end
+```text
+帮我安装这个仓库：检查 macOS 环境与 Xcode 命令行工具，编译并签名 VBAN Ultimate，安装 CoreAudio 虚拟音频驱动，并将应用固化部署到 /Applications。
 ```
 
----
-
-## ✨ 核心特性
-
-- **双列流对称卡片排版**：左列纯粹展示接收流（RX）动态采样率、声道、位深（真实动态解析 8/16/24/32-bit）、真实吞吐与抖动丢包；右列展示发送流（TX）设备源、目标 IP 与对称带宽指示。
-- **4x4 点阵矩阵对齐设计**：矩阵方格与点阵画布实行点对点数学对齐（$4 \times 24 = 96\text{pt}$），视觉通透；激活状态中心高亮显示醒目 `ON` 标头，支持单击直观建立或切断路由。
-- **双列声场横向电平表**：支持 1CH / 2CH / 4CH / 6CH / 8CH 多声道立体声场左右对称对阵排布，50Hz 真实物理能量直出，无信号时呈现专业静音基准 `-∞ dB`。
-- **智能端口冲突排查接管**：当 UDP 6980 被外部程序占用时，拒绝静默降级，常驻右上角安全警示，支持一键探测占用进程并原生弹窗授权安全接管。
-- **国际化双语热切换**：全系统支持简体中文与英文专业音频术语一键平滑热切换，所有操作指引与技术参数说明全部收敛至原生悬浮提示（Tooltip）。
+> [!TIP]
+> AI 代理将自动执行环境检查、调用工程内置的编译脚本、完成驱动注册并配置权限，免去手动输入多条命令的繁琐步骤。
 
 ---
 
-## 💻 系统与硬件要求
+## 传统开始
 
-- **操作系统**：macOS 13.0 (Ventura) 及以上版本（支持 macOS 14 Sonoma 与 macOS 15 Sequoia）；
-- **硬件架构**：Apple Silicon (`arm64`，M1 / M2 / M3 / M4 架构原生编译与优化）；
-- **开发工具**：Xcode Command Line Tools（包含 `clang++` 与 `swiftc`）。
+### 方式一：下载预编译发布包（推荐）
 
----
-
-## 🚀 快速安装与使用
-
-### 方式 1：直接下载正式发布包
-从 GitHub Releases 下载预编译发布包：
-1. 下载 `VBANUltimate-v1.0.0-macOS-arm64.dmg` 或 `.zip`；
-2. 将 `VBANUltimate.app` 拖移至 `/Applications`（应用程序目录）；
-3. 首次使用如需虚拟音频线缆功能，在终端运行项目脚本安装系统驱动：
+1. 前往 [Releases](https://github.com/yourpapayouknow/VbanUltimateforiwmei/releases) 页面下载最新的 `VBANUltimate-v1.0.0-macOS-arm64.dmg`。
+2. 双击打开镜像，将 `VBANUltimate.app` 拖入 `Applications`（应用程序）文件夹。
+3. 若需要使用系统虚拟音频线缆（Virtual Cable），请在终端中运行驱动安装脚本一次：
    ```zsh
    sudo ./Scripts/install_driver.zsh
    ```
 
-### 方式 2：从源码编译并固化至本机
-克隆仓库后，通过终端执行纯脚本构建：
+### 方式二：从源码编译与安装
+
+克隆仓库后，通过终端执行纯脚本构建与部署：
 
 ```zsh
-# 1. 编译 CoreAudio 驱动
+# 1. 编译系统级 CoreAudio HAL 虚拟音频驱动
 ./Scripts/build_driver.zsh
 
-# 2. 安装驱动至系统 HAL 目录（需要管理员授权）
+# 2. 安装驱动至系统目录（需要管理员权限）
 sudo ./Scripts/install_driver.zsh
 
-# 3. 编译并签名 macOS 原生应用程序
+# 3. 编译并签名原生应用程序
 ./Scripts/build_app.zsh
 
-# 4. 将正式版本固化部署至 /Applications
+# 4. 固化安装至系统应用目录
 cp -R build/VBANUltimate.app /Applications/
 ```
 
 ---
 
-## 🛠️ 自动化测试套件
+## 特性
 
-工程内建完整的 C++20 与 Swift 原生验证套件，覆盖协议、无锁环形队列、并发网络与硬件枚举：
+- **单端口全双工复用**：严格遵循官方 UDP 6980 协议端口，单个套接字完成多路音频流零拷贝解复用与发送。
+- **4x4 点阵专业音频路由矩阵**：点对点数学对齐画布（$4 \times 24 = 96\text{pt}$），支持单目标输出源互斥切换与广播级一对多分发（Fan-out）。
+- **CoreAudio HAL 原生虚拟音频线缆**：自主研发系统级 `AudioServerPlugIn` 驱动，在系统“音频与MIDI设置”中原生可见，参数热更新无需重启系统守护进程。
+- **双列声场横向电平表**：支持 1CH/2CH/4CH/6CH/8CH 声道立体声场左右对称排布，50Hz 真实物理能量驱动，静音基线标准 `-∞ dB`。
+- **微秒级抖动诊断与自适应吸收**：多级自适应抖动缓冲区，无锁 SPSC 环形队列，实时呈现吞吐带宽、丢包与微秒抖动指标。
+- **智能端口冲突接管**：遭遇外部程序独占 UDP 6980 时拒绝静默降级，原生深色弹窗支持一键安全排查并接管端口。
+- **原生深色双语界面**：SwiftUI 纯原生实现，严格遵循暗调工业美学规范，支持中文与英文专业术语即时热切换。
 
-```zsh
-# 运行协议头与边界测试
-clang++ -std=c++20 -O2 Tests/TestVBANParser.cpp -o bin/test_vban_parser && ./bin/test_vban_parser
+---
 
-# 运行本地 UDP 回环多流测试
-clang++ -std=c++20 -O2 Tests/TestNetworkLoopback.cpp -o bin/test_network_loopback && ./bin/test_network_loopback
+## 系统架构
 
-# 运行无锁 SPSC 环形缓冲高并发测试
-clang++ -std=c++20 -O2 Tests/TestRingBuffer.cpp -o bin/test_ring_buffer && ./bin/test_ring_buffer
+```mermaid
+graph TD
+    subgraph LAN [局域网 VBAN 网络音频流]
+        PC1[工作站 A 发送端] -->|UDP:6980| SOCK[单 UDP 套接字]
+        PC2[工作站 B 发送端] -->|UDP:6980| SOCK
+    end
 
-# 运行 CoreAudio 硬件设备探测测试
-clang++ -std=c++20 -O2 -framework CoreAudio -framework CoreFoundation Tests/TestAudioDeviceCatalog.cpp -o bin/test_device_catalog && ./bin/test_device_catalog
+    subgraph Core [C++20 RT-Safe 音频与网络内核]
+        SOCK --> DMX[流解复用器 Demuxer]
+        DMX --> JB[自适应抖动缓冲 JitterBuffer]
+        JB --> RB[无锁 SPSC 环形队列 RingBuffer]
+        RB --> RTR[4x4 点阵矩阵路由 MatrixRouter]
+    end
 
-# 运行正弦波音频还原重建测试
-clang++ -std=c++20 -O2 Tests/TestAudioLoopback.cpp -o bin/test_audio_loopback && ./bin/test_audio_loopback
-
-# 运行虚拟线缆生命周期与 Plist 存储测试
-clang++ -std=c++20 -O2 -framework CoreAudio -framework CoreFoundation Tests/TestCableManager.cpp -o bin/test_cable_manager && ./bin/test_cable_manager
-
-# 运行矩阵路由分发测试
-clang++ -std=c++20 -O2 -framework CoreAudio -framework CoreFoundation Tests/TestMatrixRouter.cpp -o bin/test_matrix_router && ./bin/test_matrix_router
+    subgraph macOS [macOS 系统 CoreAudio HAL]
+        RTR --> SPK[物理扬声器 / 耳机输出]
+        RTR --> DRV[VBANUltimateAudio.driver]
+        DRV --> CBL1[虚拟音频线缆 Cable A]
+        DRV --> CBL2[虚拟音频线缆 Cable B]
+        CBL1 --> OBS[OBS Studio / Logic Pro / 会议软件]
+    end
 ```
 
 ---
 
-## 📜 开源鸣谢与致敬
+## 系统要求
 
-- **[VB-Audio Software](https://vb-audio.com/) (Vincent Burel)**：VBAN 协议原创发明者与官方标准制定者。
-- **[Existential Audio / BlackHole](https://github.com/ExistentialAudio/BlackHole) (Devin Roth)**：macOS 虚拟音频回环驱动架构与 CoreAudio HAL 规范实践的先驱。
-- **[libASPL](https://github.com/gavv/aspl) (Alexander Gavrilov)**：现代 C++ 面向对象的 CoreAudio `AudioServerPlugIn` 开源框架。
+- **操作系统**：macOS 13.0 (Ventura) 或更高版本（深度支持 macOS 14 Sonoma 与 macOS 15 Sequoia）；
+- **硬件架构**：Apple Silicon（`arm64`，针对 M1/M2/M3/M4 系列芯片原生优化）；
+- **开发工具**：Xcode Command Line Tools（提供 `clang++` 与 `swiftc`）。
 
 ---
 
-## 📄 许可证
+## 验证与测试
 
-本项目遵循 MIT 协议开源。详细信息请参阅 [LICENSE](LICENSE) 文件。
+工程提供完备的端到端自动化测试集，覆盖协议解析、网络并发、环形队列与系统硬件枚举：
+
+```zsh
+# 协议解析与数据边界测试
+clang++ -std=c++20 -O2 Tests/TestVBANParser.cpp -o bin/test_vban_parser && ./bin/test_vban_parser
+
+# 本地多流 UDP 回环测试
+clang++ -std=c++20 -O2 Tests/TestNetworkLoopback.cpp -o bin/test_network_loopback && ./bin/test_network_loopback
+
+# 无锁 SPSC 环形队列并发测试
+clang++ -std=c++20 -O2 Tests/TestRingBuffer.cpp -o bin/test_ring_buffer && ./bin/test_ring_buffer
+
+# 系统硬件声卡枚举测试
+clang++ -std=c++20 -O2 -framework CoreAudio -framework CoreFoundation Tests/TestAudioDeviceCatalog.cpp -o bin/test_device_catalog && ./bin/test_device_catalog
+
+# 正弦波音频还原重建测试
+clang++ -std=c++20 -O2 Tests/TestAudioLoopback.cpp -o bin/test_audio_loopback && ./bin/test_audio_loopback
+
+# 虚拟音频线缆生命周期与存储测试
+clang++ -std=c++20 -O2 -framework CoreAudio -framework CoreFoundation Tests/TestCableManager.cpp -o bin/test_cable_manager && ./bin/test_cable_manager
+
+# 矩阵路由分发与增益测试
+clang++ -std=c++20 -O2 -framework CoreAudio -framework CoreFoundation Tests/TestMatrixRouter.cpp -o bin/test_matrix_router && ./bin/test_matrix_router
+```
