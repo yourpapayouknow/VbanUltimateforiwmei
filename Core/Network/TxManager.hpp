@@ -35,6 +35,8 @@ struct TxStreamCtx {
 // 发送流生命周期管理与网络发射引擎
 class TxMgr {
 public:
+    using CapCb = std::function<ssize_t(const std::string&, uint8_t*, size_t)>;
+
     // 初始化发射管理器
     TxMgr() : th_run_(false) {
         sck_ = std::make_shared<UdpSck>();
@@ -45,6 +47,12 @@ public:
     // 析构清理
     ~TxMgr() {
         stpall();
+    }
+
+    // 绑定发送流的设备采集入口
+    void setcapcb(CapCb cb) {
+        std::lock_guard<std::mutex> lock(mtx_);
+        capcb_ = std::move(cb);
     }
 
     // 添加或更新发送流配置
@@ -178,29 +186,26 @@ private:
         }
     }
 
-    // 单包承载的采样帧数
-    static constexpr uint32_t kSmplsPerPkt = 256;
-
     // 采集样本并按流格式编码负载
-    size_t gtpyld(TxStreamCtx& s, uint8_t* dst, size_t maxlen) {
-        // 取出采集样本并按流格式量化写入负载区
-        const uint32_t smpls = kSmplsPerPkt;
+    uint32_t gtpyld(TxStreamCtx& s, uint8_t* dst, size_t maxlen) {
+        // 按协议包长从设备读取完整采样帧
         const uint32_t ch    = s.ch ? s.ch : 1;
         const uint32_t bpsz  = gtbpsz(s.fmt);
-        const size_t   total = static_cast<size_t>(smpls) * ch;
-        const size_t   need  = total * bpsz;
-        if (need == 0 || need > maxlen) {
+        const uint32_t smpls = std::min<uint32_t>(kMaxSmpls, kMaxPyld / (ch * bpsz));
+        if (!capcb_ || smpls == 0) {
             return 0;
         }
-
+        const size_t total = static_cast<size_t>(smpls) * ch;
         if (flt_.size() < total) {
             flt_.resize(total, 0.0f);
         }
-
-        // 采集源由官方 emitter 直接驱动，此处输出静音帧保持时序连续
-        std::memset(flt_.data(), 0, total * sizeof(float));
-        encpcm(dst, flt_.data(), total, s.fmt);
-        return need;
+        const ssize_t got = capcb_(s.name, reinterpret_cast<uint8_t*>(flt_.data()),
+                                   total * sizeof(float));
+        if (got <= 0) return 0;
+        const uint32_t frms = static_cast<uint32_t>(got / (ch * sizeof(float)));
+        if (frms == 0 || static_cast<size_t>(frms) * ch * bpsz > maxlen) return 0;
+        encpcm(dst, flt_.data(), static_cast<size_t>(frms) * ch, s.fmt);
+        return frms;
     }
 
     // 将浮点样本量化为指定协议格式
@@ -264,22 +269,24 @@ private:
                     if (now < s->next_snd) continue;
 
                     const uint32_t bpsz = gtbpsz(s->fmt);
-                    const size_t pyldsz = kSmplsPerPkt * s->ch * bpsz;
+                    const size_t pyldsz = kMaxPyld;
 
                     if (pyldbuf.size() < pyldsz) {
                         pyldbuf.resize(pyldsz, 0);
                     }
 
                     // 采集样本并按流格式编码负载
-                    if (gtpyld(*s, pyldbuf.data(), pyldbuf.size()) != pyldsz) {
+                    const uint32_t smpls = gtpyld(*s, pyldbuf.data(), pyldbuf.size());
+                    if (smpls == 0) {
                         continue;
                     }
+                    const size_t used = static_cast<size_t>(smpls) * s->ch * bpsz;
 
                     // 组装并发送报文
                     size_t pktsz = bldpkt(pktbuf.data(), pktbuf.size(),
                                           s->name.c_str(), s->sr, s->ch,
-                                          kSmplsPerPkt, s->fmt, s->nu_frm++,
-                                          pyldbuf.data(), pyldsz);
+                                          smpls, s->fmt, s->nu_frm++,
+                                          pyldbuf.data(), used);
 
                     if (pktsz > 0 && sck_) {
                         ssize_t sent = sck_->sndsck(s->dst_ip.c_str(), s->dst_prt, pktbuf.data(), pktsz);
@@ -290,10 +297,10 @@ private:
                             inf.proto  = ProtoSub::Audio;
                             inf.sr     = s->sr;
                             inf.ch     = s->ch;
-                            inf.smpls  = kSmplsPerPkt;
+                            inf.smpls  = smpls;
                             inf.fmt    = s->fmt;
                             inf.bpsz   = bpsz;
-                            inf.pyldsz = static_cast<uint32_t>(pyldsz);
+                            inf.pyldsz = static_cast<uint32_t>(used);
                             inf.frmcnt = s->nu_frm;
                             std::strncpy(inf.strm, s->name.c_str(), kStrmSz);
                             inf.strm[kStrmSz] = '\0';
@@ -302,7 +309,7 @@ private:
                         }
                     }
 
-                    const uint64_t step_us = (uint64_t)kSmplsPerPkt * 1000000ULL / (s->sr > 0 ? s->sr : 48000);
+                    const uint64_t step_us = (uint64_t)smpls * 1000000ULL / (s->sr > 0 ? s->sr : 96000);
                     s->next_snd = now + std::chrono::microseconds(step_us);
                 }
             }
@@ -315,6 +322,7 @@ private:
     std::vector<std::shared_ptr<TxStreamCtx>> strms_;
     std::shared_ptr<UdpSck>                  sck_;
     std::vector<float>                       flt_;
+    CapCb                                    capcb_;
     std::thread                              tx_th_;
     std::atomic<bool>                        th_run_;
 };

@@ -52,8 +52,8 @@
     std::map<std::string, std::shared_ptr<vban::OffAud>>   rx_aud_;
     std::map<std::string, std::shared_ptr<vban::OffRcvr>>  rx_rcv_;
     std::map<std::string, std::shared_ptr<vban::OffAud>>   tx_aud_;
-    std::map<std::string, std::shared_ptr<vban::OffEmitr>> tx_emt_;
     std::mutex                                             rx_mtx_;
+    std::mutex                                             tx_mtx_;
     std::shared_ptr<vban::TxMgr>      tx_mgr_;
     std::shared_ptr<vban::MtrcsEngn>  mtr_;
     std::thread                       rx_th_;
@@ -104,6 +104,12 @@
         cbl_           = std::make_shared<vban::CblMgr>();
         rtr_           = std::make_shared<vban::MtrxRtr>();
         tx_mgr_        = std::make_shared<vban::TxMgr>();
+        __unsafe_unretained VbanBridge *bridge_ptr = self;
+        tx_mgr_->setcapcb([bridge_ptr](const std::string& strm, uint8_t* dst, size_t size) -> ssize_t {
+            std::lock_guard<std::mutex> lk(bridge_ptr->tx_mtx_);
+            auto it = bridge_ptr->tx_aud_.find(strm);
+            return it != bridge_ptr->tx_aud_.end() ? it->second->read(dst, size) : 0;
+        });
         mtr_           = std::make_shared<vban::MtrcsEngn>(dmx_, cbl_, rtr_, tx_mgr_);
         th_run_           = false;
         is_run_           = false;
@@ -475,10 +481,14 @@
 // 应用发送流采集设备绑定
 - (void)hndltx:(NSDictionary<NSString *, NSString *> *)map {
     // 对照官方 emitter：为每条发送流建立采集后端
+    std::map<std::string, vban::StrmCfg> cfgs;
+    for (NSString *strm in map) {
+        cfgs[[strm UTF8String]] = [self txcfgOfStream:strm];
+    }
+    std::lock_guard<std::mutex> lk(tx_mtx_);
     for (auto it = tx_aud_.begin(); it != tx_aud_.end();) {
         NSString *k = [NSString stringWithUTF8String:it->first.c_str()];
         if (map[k] == nil) {
-            tx_emt_.erase(it->first);
             it = tx_aud_.erase(it);
         } else {
             ++it;
@@ -497,13 +507,12 @@
             continue;
         }
 
-        vban::StrmCfg cfg = [self txcfgOfStream:strm];
+        vban::StrmCfg cfg = cfgs[key];
         if (!cfg.ch || !cfg.sr) continue;
 
         auto aud = std::make_shared<vban::OffAud>();
         aud->init(vban::AudDir::In, dev.devId);
         aud->setcfg(cfg);
-        tx_emt_[key] = std::make_shared<vban::OffEmitr>(aud, key);
         tx_aud_[key] = aud;
         [tx_active_ addObject:strm];
     }

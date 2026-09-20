@@ -5,7 +5,6 @@
 #include "../Common/Types.hpp"
 #include "../VBAN/Protocol.hpp"
 #include "../VBAN/Parser.hpp"
-#include "../VBAN/Packetizer.hpp"
 #include "OfficialAudio.hpp"
 
 namespace vban {
@@ -94,57 +93,6 @@ private:
     std::shared_ptr<OffAud> aud_;
     std::string             strm_;
     std::vector<float>      pcm_;
-};
-
-// 对照官方 emitter：从设备读取即发包
-class OffEmitr {
-public:
-    explicit OffEmitr(std::shared_ptr<OffAud> aud, std::string strm)
-        : aud_(std::move(aud)), strm_(std::move(strm)) {}
-
-    // 取出一批采集样本并打包为 VBAN 报文
-    size_t mkpkt(uint8_t* dst, size_t maxlen) {
-        // 依官方上限读取并封装单个报文
-        if (!aud_ || !dst) return 0;
-
-        const StrmCfg& cfg = aud_->gtcfg();
-        if (cfg.ch == 0 || cfg.sr == 0) return 0;
-
-        const uint32_t bpsz = 2;
-        const size_t   smpls = kMaxSmpls;
-        const size_t   want = smpls * cfg.ch * bpsz;
-        if (want + kHdrSz > maxlen) return 0;
-
-        if (raw_.size() < want) raw_.resize(want, 0);
-        const ssize_t got = aud_->read(raw_.data(), want);
-        if (got <= 0) return 0;
-
-        const size_t frms = static_cast<size_t>(got) / (cfg.ch * bpsz);
-        if (frms == 0) return 0;
-
-        // 浮点样本量化为 16 位整型负载
-        if (flt_.size() < frms * cfg.ch) flt_.resize(frms * cfg.ch, 0.0f);
-        const size_t total = frms * cfg.ch;
-        std::memcpy(flt_.data(), raw_.data(), total * sizeof(float));
-
-        if (pcm_.size() < total) pcm_.resize(total, 0);
-        for (size_t i = 0; i < total; ++i) {
-            const float v = std::clamp(flt_[i], -1.0f, 1.0f);
-            pcm_[i] = static_cast<int16_t>(std::lrint(v * 32767.0f));
-        }
-
-        return bldpkt(dst, maxlen, strm_.c_str(), cfg.sr, cfg.ch,
-                      static_cast<uint32_t>(frms), SmplFmt::Int16, frm_++,
-                      pcm_.data(), total * sizeof(int16_t));
-    }
-
-private:
-    std::shared_ptr<OffAud> aud_;
-    std::string             strm_;
-    uint32_t                frm_{0};
-    std::vector<uint8_t>    raw_;
-    std::vector<float>      flt_;
-    std::vector<int16_t>    pcm_;
 };
 
 #endif // __APPLE__
