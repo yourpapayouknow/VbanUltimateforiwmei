@@ -3,6 +3,7 @@
 
 #include "../Common/Head.hpp"
 #include "../Common/Types.hpp"
+#include "../Common/RingBuffer.hpp"
 #include "DeviceCatalog.hpp"
 
 namespace vban {
@@ -57,11 +58,8 @@ public:
         const size_t frms = size / (cfg_.ch * 4);
         if (frms == 0) return 0;
 
-        if (pend_.size() < size) pend_.resize(size);
-        std::memcpy(pend_.data(), buf, size);
-        pend_sz_ = size;
-        pend_rd_ = 0;
-        return static_cast<ssize_t>(size);
+        return static_cast<ssize_t>(play_.wrblks(
+            reinterpret_cast<const float*>(buf), frms * cfg_.ch) * sizeof(float));
     }
 
     // 对照官方 audio_read：从设备取出采集负载
@@ -73,12 +71,10 @@ public:
         const size_t frms = size / (cfg_.ch * 4);
         if (frms == 0) return 0;
 
-        if (cap_.empty()) return 0;
-        const size_t avl = cap_.size();
-        const size_t use = (avl < size) ? avl : size;
-        std::memcpy(buf, cap_.data(), use);
-        cap_.clear();
-        return static_cast<ssize_t>(use);
+        const size_t use = std::min(cap_.gtavlr(), frms * cfg_.ch);
+        if (use == 0) return 0;
+        cap_.rdblks(reinterpret_cast<float*>(buf), use);
+        return static_cast<ssize_t>(use * sizeof(float));
     }
 
     // 关闭后端
@@ -93,7 +89,8 @@ public:
             unit_ = nullptr;
         }
         run_ = false;
-        cap_.clear();
+        cap_.rstbuf();
+        play_.rstbuf();
     }
 
     // 释放全部资源
@@ -112,24 +109,19 @@ public:
     // 由采集回调填入样本
     void pshcap(const float* src, size_t cnt) {
         // 供输入回调写入采集样本
-        cap_.assign(src, src + cnt);
+        cap_.wrblks(src, cnt);
     }
 
     // 由回放回调取出样本
     size_t poppnd(float* dst, size_t cnt) {
         // 供输出回调取出待回放样本
-        if (pend_rd_ + cnt * sizeof(float) > pend_sz_) {
-            return 0;
-        }
-        std::memcpy(dst, pend_.data() + pend_rd_, cnt * sizeof(float));
-        pend_rd_ += cnt * sizeof(float);
-        return cnt;
+        return play_.rdblks(dst, cnt);
     }
 
     // 查询待回放样本是否充足
     bool hspend(size_t cnt) const {
         // 判断待回放区是否够取
-        return pend_rd_ + cnt * sizeof(float) <= pend_sz_;
+        return play_.gtavlr() >= cnt;
     }
 
 private:
@@ -184,10 +176,6 @@ private:
             close();
             return false;
         }
-        const AudioUnitScope cscp = for_in ? kAudioUnitScope_Input : kAudioUnitScope_Output;
-        AudioUnitSetProperty(unit_, kAudioUnitProperty_StreamFormat,
-                             cscp, 0, &asbd, sizeof(asbd));
-
         cb_.inputProc       = for_in ? &OffAud::incall : &OffAud::outcall;
         cb_.inputProcRefCon = this;
         if (for_in) {
@@ -209,13 +197,21 @@ private:
             close();
             return false;
         }
+        if (for_in) {
+            UInt32 frames = 0;
+            UInt32 size = sizeof(frames);
+            if (AudioUnitGetProperty(unit_, kAudioUnitProperty_MaximumFramesPerSlice,
+                                     kAudioUnitScope_Global, 0, &frames, &size) != noErr || frames == 0) {
+                close();
+                return false;
+            }
+            tmp_.resize(static_cast<size_t>(frames) * cfg_.ch);
+        }
         if (AudioOutputUnitStart(unit_) != noErr) {
             close();
             return false;
         }
 
-        pend_sz_ = 0;
-        pend_rd_ = 0;
         run_ = true;
         return true;
     }
@@ -232,9 +228,7 @@ private:
         const uint32_t ch = data->mBuffers[0].mNumberChannels;
         const size_t cnt = static_cast<size_t>(frames) * ch;
 
-        if (!self->poppnd(dst, cnt)) {
-            std::memset(dst, 0, cnt * sizeof(float));
-        }
+        self->poppnd(dst, cnt);
         return noErr;
     }
 
@@ -248,7 +242,7 @@ private:
 
         const uint32_t ch = self->cfg_.ch ? self->cfg_.ch : 1;
         const size_t cnt = static_cast<size_t>(frames) * ch;
-        if (self->tmp_.size() < cnt) self->tmp_.resize(cnt, 0.0f);
+        if (self->tmp_.size() < cnt) return noErr;
 
         auto* abl = reinterpret_cast<AudioBufferList*>(self->abl_.data());
         abl->mNumberBuffers = 1;
@@ -271,10 +265,8 @@ private:
     AURenderCallbackStruct cb_{};
     std::vector<uint8_t>   abl_;
     std::vector<float>     tmp_;
-    std::vector<float>     cap_;
-    std::vector<uint8_t>   pend_;
-    size_t                 pend_sz_{0};
-    size_t                 pend_rd_{0};
+    RingBuf<float>         cap_{65536};
+    RingBuf<float>         play_{65536};
 };
 
 #endif // __APPLE__
