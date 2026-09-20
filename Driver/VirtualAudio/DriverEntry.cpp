@@ -200,6 +200,7 @@ static DevEnt blddev(const CblCfg& cfg) {
     params.DeviceUID    = "com.iwmei.vbanultimate.audio." + cfg.id;
     params.ModelUID     = "com.iwmei.vbanultimate.audio.model";
     params.SampleRate   = cfg.sr;
+    params.ZeroTimeStampPeriod = CblRing::kFrms;
     params.ChannelCount = cfg.chs;
     params.EnableMixing = true;
     params.ClockIsStable = true;
