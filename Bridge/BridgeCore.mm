@@ -78,8 +78,8 @@
 // 将收到的报文送入对应接收流的官方 receptor
 - (void)feedPkt:(const uint8_t *)buf len:(size_t)len;
 
-// 按线缆标识检索对应音频设备
-- (nullable VbanAudioDevDesc *)devByCableId:(NSString *)cableId;
+// 按矩阵端点检索对应音频设备
+- (nullable VbanAudioDevDesc *)devByEndpoint:(NSString *)endpoint;
 
 @end
 
@@ -428,12 +428,14 @@
         const auto &did = r.dst.id;
 
         // 网络接收流到虚拟线缆
-        if (r.src.typ == vban::EndpntTyp::Vban && r.dst.typ == vban::EndpntTyp::Cable) {
+        if (r.src.typ == vban::EndpntTyp::Vban &&
+            (r.dst.typ == vban::EndpntTyp::Cable || r.dst.typ == vban::EndpntTyp::Physical)) {
             rxDev[[NSString stringWithUTF8String:sid.c_str()]] =
                 [NSString stringWithUTF8String:did.c_str()];
         }
         // 虚拟线缆到网络发送流
-        if (r.src.typ == vban::EndpntTyp::Cable && r.dst.typ == vban::EndpntTyp::Vban) {
+        if ((r.src.typ == vban::EndpntTyp::Cable || r.src.typ == vban::EndpntTyp::Physical) &&
+            r.dst.typ == vban::EndpntTyp::Vban) {
             txDev[[NSString stringWithUTF8String:did.c_str()]] =
                 [NSString stringWithUTF8String:sid.c_str()];
         }
@@ -461,7 +463,7 @@
 
     for (NSString *strm in map) {
         NSString *cableId = map[strm];
-        VbanAudioDevDesc *dev = [self devByCableId:cableId];
+        VbanAudioDevDesc *dev = [self devByEndpoint:cableId];
         if (!dev || dev.outChannels == 0) continue;
 
         const std::string key = [strm UTF8String];
@@ -498,7 +500,7 @@
 
     for (NSString *strm in map) {
         NSString *cableId = map[strm];
-        VbanAudioDevDesc *dev = [self devByCableId:cableId];
+        VbanAudioDevDesc *dev = [self devByEndpoint:cableId];
         if (!dev || dev.inChannels == 0) continue;
 
         const std::string key = [strm UTF8String];
@@ -548,15 +550,18 @@
     return cfg;
 }
 
-// 按线缆标识检索对应音频设备
-- (nullable VbanAudioDevDesc *)devByCableId:(NSString *)cableId {
-    // 在虚拟线缆列表中匹配标识并取同名系统设备
+// 按矩阵端点检索对应音频设备
+- (nullable VbanAudioDevDesc *)devByEndpoint:(NSString *)endpoint {
+    // 在线缆标识与物理设备UID中查找设备
     for (VbanCableDesc *c in [self getCables]) {
-        if ([c.cableId isEqualToString:cableId]) {
+        if ([c.cableId isEqualToString:endpoint]) {
             for (VbanAudioDevDesc *d in [self getDevices]) {
                 if ([d.name isEqualToString:c.name]) return d;
             }
         }
+    }
+    for (VbanAudioDevDesc *d in [self getDevices]) {
+        if ([d.uid isEqualToString:endpoint]) return d;
     }
     return nil;
 }
