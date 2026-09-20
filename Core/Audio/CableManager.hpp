@@ -15,7 +15,7 @@ struct CblItem {
     std::string id;
     std::string name;
     uint32_t    chs{2};
-    uint32_t    sr{48000};
+    uint32_t    sr{96000};
     bool        en{true};
 };
 
@@ -45,7 +45,7 @@ public:
     }
 
     // 添加新的虚拟音频线缆
-    bool addcbl(const std::string& id, const std::string& name, uint32_t chs = 2, uint32_t sr = 48000) {
+    bool addcbl(const std::string& id, const std::string& name, uint32_t chs = 2, uint32_t sr = 96000) {
         // 向配置集合添加新线缆并同步保存
         if (id.empty() || name.empty() || chs == 0) {
             return false;
@@ -168,7 +168,7 @@ private:
                 CFNumberGetValue(ch, kCFNumberIntType, &v);
                 if (v >= 1 && v <= 256) chs = static_cast<uint32_t>(v);
             }
-            uint32_t sr = 48000;
+            uint32_t sr = 96000;
             CFNumberRef srv = (CFNumberRef)CFDictionaryGetValue(d, CFSTR("sampleRate"));
             if (srv && CFGetTypeID(srv) == CFNumberGetTypeID()) {
                 int v = 0;

@@ -474,7 +474,7 @@ struct AddCableSheet: View {
 
     @State private var name = ""
     @State private var channels: UInt32 = 2
-    @State private var sampleRate: UInt32 = 48000
+    @State private var sampleRate: UInt32 = 96000
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -569,7 +569,7 @@ struct EditCableSheet: View {
 
     @State private var name = ""
     @State private var channels: UInt32 = 2
-    @State private var sampleRate: UInt32 = 48000
+    @State private var sampleRate: UInt32 = 96000
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -663,4 +663,3 @@ struct EditCableSheet: View {
         }
     }
 }
-

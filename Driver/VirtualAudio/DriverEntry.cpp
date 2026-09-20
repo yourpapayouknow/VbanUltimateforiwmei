@@ -141,7 +141,7 @@ static std::vector<CblCfg> rdcfg() {
             CFNumberGetValue(ch, kCFNumberIntType, &v);
             if (v >= 1 && v <= 256) chs = (uint32_t)v;
         }
-        uint32_t sr = 48000;
+        uint32_t sr = 96000;
         CFNumberRef srv = (CFNumberRef)CFDictionaryGetValue(d, CFSTR("sampleRate"));
         if (srv && CFGetTypeID(srv) == CFNumberGetTypeID()) {
             int v = 0;

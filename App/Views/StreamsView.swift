@@ -402,7 +402,7 @@ struct EditTxStreamSheet: View {
     @State private var source: String = ""
     @State private var targetIp: String = ""
     @State private var targetPort: String = ""
-    @State private var sampleRate: UInt32 = 48000
+    @State private var sampleRate: UInt32 = 96000
     @State private var channels: UInt32 = 2
     @State private var bitDepth: UInt32 = 24
 
@@ -535,7 +535,7 @@ struct AddTxStreamSheet: View {
     @State private var source = ""
     @State private var targetIp = "192.168.1.50"
     @State private var targetPort = "6980"
-    @State private var sampleRate: UInt32 = 48000
+    @State private var sampleRate: UInt32 = 96000
     @State private var channels: UInt32 = 2
     @State private var bitDepth: UInt32 = 24
 
@@ -651,4 +651,3 @@ struct AddTxStreamSheet: View {
         }
     }
 }
-

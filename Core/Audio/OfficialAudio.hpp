@@ -58,8 +58,9 @@ public:
         const size_t frms = size / (cfg_.ch * 4);
         if (frms == 0) return 0;
 
+        const size_t fit = std::min(frms, play_.gtavlw() / cfg_.ch);
         return static_cast<ssize_t>(play_.wrblks(
-            reinterpret_cast<const float*>(buf), frms * cfg_.ch) * sizeof(float));
+            reinterpret_cast<const float*>(buf), fit * cfg_.ch) * sizeof(float));
     }
 
     // 对照官方 audio_read：从设备取出采集负载
@@ -106,10 +107,14 @@ public:
     // 查询后端是否运行
     bool gtrun() const { return run_; }
 
+    // 查询绑定的音频设备
+    AudioDeviceID gtdev() const { return dev_; }
+
     // 由采集回调填入样本
     void pshcap(const float* src, size_t cnt) {
         // 供输入回调写入采集样本
-        cap_.wrblks(src, cnt);
+        const size_t fit = std::min(cnt / cfg_.ch, cap_.gtavlw() / cfg_.ch);
+        cap_.wrblks(src, fit * cfg_.ch);
     }
 
     // 由回放回调取出样本

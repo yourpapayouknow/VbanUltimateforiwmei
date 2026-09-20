@@ -15,7 +15,7 @@ struct DevInf {
     std::string   name;
     uint32_t      inchs{0};
     uint32_t      outchs{0};
-    double        sr{48000.0};
+    double        sr{96000.0};
     bool          is_dfltin{false};
     bool          is_dfltout{false};
 };

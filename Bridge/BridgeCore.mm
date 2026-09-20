@@ -465,7 +465,7 @@
         if (!dev || dev.outChannels == 0) continue;
 
         const std::string key = [strm UTF8String];
-        if (rx_aud_.count(key)) {
+        if (rx_aud_.count(key) && rx_aud_[key]->gtdev() == dev.devId) {
             [rx_active_ addObject:strm];
             continue;
         }
@@ -502,13 +502,13 @@
         if (!dev || dev.inChannels == 0) continue;
 
         const std::string key = [strm UTF8String];
-        if (tx_aud_.count(key)) {
+        vban::StrmCfg cfg = cfgs[key];
+        if (!cfg.ch || !cfg.sr) continue;
+        if (tx_aud_.count(key) && tx_aud_[key]->gtdev() == dev.devId) {
+            tx_aud_[key]->setcfg(cfg);
             [tx_active_ addObject:strm];
             continue;
         }
-
-        vban::StrmCfg cfg = cfgs[key];
-        if (!cfg.ch || !cfg.sr) continue;
 
         auto aud = std::make_shared<vban::OffAud>();
         aud->init(vban::AudDir::In, dev.devId);

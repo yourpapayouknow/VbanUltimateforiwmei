@@ -22,7 +22,7 @@ struct TxStreamCtx {
     std::string       src;
     std::string       dst_ip;
     uint16_t          dst_prt{6980};
-    uint32_t          sr{48000};
+    uint32_t          sr{96000};
     uint32_t          ch{2};
     uint32_t          bdepth{24};
     SmplFmt           fmt{SmplFmt::Int24};
