@@ -11,6 +11,15 @@ namespace vban {
 
 #if defined(__APPLE__)
 
+// 转换有符号24位PCM样本
+inline float cnv24(const uint8_t* b) {
+    int32_t v = (static_cast<int32_t>(b[2]) << 16) |
+                (static_cast<int32_t>(b[1]) << 8) |
+                static_cast<int32_t>(b[0]);
+    if (v & 0x800000) v |= ~0xFFFFFF;
+    return static_cast<float>(v) / 8388608.0f;
+}
+
 // 对照官方 receptor：收包即写入设备
 class OffRcvr {
 public:
@@ -64,10 +73,7 @@ private:
             case SmplFmt::Int24: {
                 const auto* b = inf.pyld;
                 for (uint32_t i = 0; i < total; ++i) {
-                    const int32_t v = (static_cast<int32_t>(b[i * 3 + 2]) << 16) |
-                                      (static_cast<int32_t>(b[i * 3 + 1]) << 8) |
-                                      (static_cast<int32_t>(b[i * 3 + 0]));
-                    dst[i] = static_cast<float>(v) / 8388608.0f;
+                    dst[i] = cnv24(b + i * 3);
                 }
                 return true;
             }
