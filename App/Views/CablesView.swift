@@ -95,6 +95,7 @@ struct CablesView: View {
             Text(model.t("设备名称", "Device Name"))
                 .frame(width: 150, alignment: .leading)
             Text(model.t("音频电平", "Audio Level"))
+                .padding(.leading, 24)
                 .frame(width: 380, alignment: .leading)
             Text(model.t("配置格式", "Configuration"))
                 .frame(width: 150, alignment: .leading)
