@@ -187,6 +187,8 @@ final class AppModel: ObservableObject {
     @Published var cables: [VbanCableDesc] = []
     @Published var devices: [VbanAudioDevDesc] = []
     @Published var routes: [VbanRouteDesc] = []
+    @Published private(set) var soloRouteId: String? = nil
+    private var soloRouteStates: [String: Bool] = [:]
 
     // 矩阵输入行与输出列槽位
     @Published var inSlots: [MatrixSlot] = [] {
@@ -775,6 +777,61 @@ final class AppModel: ObservableObject {
             fillSlot(dstId, name: dstName, kind: dstKind, input: false)
             saveRoutes()
         }
+    }
+
+    // 查询路由的持久化端点资料
+    func routeRecord(id: String) -> MatrixRoute? {
+        storedRoutes.first { $0.id == id }
+    }
+
+    // 更新路由端点并保留路由身份与启用状态
+    func updateRoute(id: String, srcId: String, srcName: String, srcKind: UInt8,
+                     dstId: String, dstName: String, dstKind: UInt8) {
+        guard let current = storedRoutes.first(where: { $0.id == id }) else { return }
+        if let conflict = routes.first(where: { $0.routeId != id && $0.dstId == dstId }) {
+            removeRoute(id: conflict.routeId)
+        }
+        guard let idx = storedRoutes.firstIndex(where: { $0.id == id }) else { return }
+        let enabled = routes.first(where: { $0.routeId == id })?.enabled ?? current.enabled
+        guard bridge.addRoute(withId: id, srcKind: srcKind, srcId: srcId, srcName: srcName,
+                              dstKind: dstKind, dstId: dstId, dstName: dstName) else { return }
+        if !enabled { bridge.toggleRoute(withId: id, enabled: false) }
+        storedRoutes[idx] = MatrixRoute(id: id, srcId: srcId, srcName: srcName, srcKind: srcKind,
+                                        dstId: dstId, dstName: dstName, dstKind: dstKind, enabled: enabled)
+        fillSlot(srcId, name: srcName, kind: srcKind, input: true)
+        fillSlot(dstId, name: dstName, kind: dstKind, input: false)
+        bridge.syncRoutes()
+        routes = bridge.getRoutes()
+        saveRoutes()
+    }
+
+    // 临时独奏指定路由或恢复独奏前状态
+    func toggleRouteSolo(id: String) {
+        if soloRouteId == id {
+            clearRouteSolo()
+            return
+        }
+        if soloRouteId == nil {
+            soloRouteStates = Dictionary(uniqueKeysWithValues: routes.map { ($0.routeId, $0.enabled) })
+        }
+        soloRouteId = id
+        for route in routes {
+            bridge.toggleRoute(withId: route.routeId, enabled: route.routeId == id)
+        }
+        bridge.syncRoutes()
+        routes = bridge.getRoutes()
+    }
+
+    // 恢复进入独奏前的路由状态
+    func clearRouteSolo() {
+        guard soloRouteId != nil else { return }
+        for route in routes {
+            bridge.toggleRoute(withId: route.routeId, enabled: soloRouteStates[route.routeId] ?? route.enabled)
+        }
+        bridge.syncRoutes()
+        routes = bridge.getRoutes()
+        soloRouteStates.removeAll()
+        soloRouteId = nil
     }
 
     func removeRoute(id: String) {

@@ -6,6 +6,20 @@ enum MatrixViewMode: String, CaseIterable {
     case matrix
 }
 
+// 路由编辑面板工作模式
+enum RouteSheetMode {
+    case create
+    case edit
+    case duplicate
+}
+
+// 携带路由数据驱动编辑面板展示
+struct RouteSheetSelection: Identifiable {
+    let id = UUID()
+    let mode: RouteSheetMode
+    let route: MatrixRoute
+}
+
 struct MatrixView: View {
     @ObservedObject var model: AppModel
 
@@ -30,7 +44,7 @@ struct MatrixView: View {
         }
         .background(Theme.windowBg)
         .sheet(isPresented: $showAddRouteSheet) {
-            AddRouteSheet(model: model, isPresented: $showAddRouteSheet)
+            AddRouteSheet(model: model, isPresented: $showAddRouteSheet, mode: .create)
         }
     }
 
@@ -83,6 +97,7 @@ struct MatrixView: View {
     // 视图切换单元
     private func viewModeItem(mode: MatrixViewMode, icon: String, tooltip: String) -> some View {
         Button(action: {
+            if mode == .matrix { model.clearRouteSolo() }
             withAnimation(.easeInOut(duration: 0.16)) {
                 viewMode = mode
             }
@@ -112,7 +127,10 @@ struct MatrixView: View {
 
     // 建立路由按钮
     private var addRouteButton: some View {
-        Button(action: { showAddRouteSheet = true }) {
+        Button(action: {
+            model.clearRouteSolo()
+            showAddRouteSheet = true
+        }) {
             HStack(spacing: 4) {
                 Image(systemName: "plus")
                     .font(.system(size: 11, weight: .bold))
@@ -140,6 +158,7 @@ struct MatrixView: View {
 // -------------------------------------------------------------
 struct MatrixListView: View {
     @ObservedObject var model: AppModel
+    @State private var routeSheet: RouteSheetSelection? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -152,6 +171,17 @@ struct MatrixListView: View {
             } else {
                 routesScrollView
             }
+        }
+        .sheet(item: $routeSheet) { selection in
+            AddRouteSheet(
+                model: model,
+                isPresented: Binding(
+                    get: { routeSheet != nil },
+                    set: { if !$0 { routeSheet = nil } }
+                ),
+                mode: selection.mode,
+                route: selection.route
+            )
         }
     }
 
@@ -169,7 +199,7 @@ struct MatrixListView: View {
                 .frame(width: 50, alignment: .center)
             Spacer()
             Text(model.t("操作", "Action"))
-                .frame(width: 44, alignment: .center)
+                .frame(width: 132, alignment: .center)
         }
         .font(Theme.cnText(12.5, weight: .bold))
         .foregroundColor(Theme.textTertiary)
@@ -239,24 +269,61 @@ struct MatrixListView: View {
             }
             .buttonStyle(.plain)
             .frame(width: 50, alignment: .center)
+            .disabled(model.soloRouteId != nil)
             .help(model.t("切换通道静音状态", "Toggle channel mute"))
 
             Spacer()
 
-            Button(action: {
-                model.removeRoute(id: r.routeId)
-            }) {
-                Image(systemName: "trash")
-                    .font(.system(size: 12))
-                    .foregroundColor(Theme.alertRed)
-            }
-            .buttonStyle(.plain)
-            .frame(width: 44, alignment: .center)
-            .help(model.t("删除该条路由连接", "Delete this routing connection"))
+            routeActions(r)
+                .frame(width: 132, alignment: .center)
         }
         .padding(.horizontal, 16)
         .frame(height: 38)
         .background(idx % 2 == 0 ? Color.clear : Theme.rowAltBg)
+    }
+
+    // 显示路由编辑、复制、独奏与删除操作
+    private func routeActions(_ route: VbanRouteDesc) -> some View {
+        HStack(spacing: 8) {
+            Button(action: { openRouteSheet(route, mode: .edit) }) {
+                Image(systemName: "pencil")
+                    .foregroundColor(Theme.neonCyan)
+            }
+            .disabled(model.soloRouteId != nil)
+            .help(model.t("编辑输入源与输出目标", "Edit source and destination"))
+
+            Button(action: { openRouteSheet(route, mode: .duplicate) }) {
+                Image(systemName: "doc.on.doc")
+                    .foregroundColor(Theme.textSecondary)
+            }
+            .disabled(model.soloRouteId != nil)
+            .help(model.t("复制输入源并建立新的分流", "Duplicate source into a new route"))
+
+            Button(action: { model.toggleRouteSolo(id: route.routeId) }) {
+                Text("S")
+                    .font(Theme.monoDigit(10, weight: .bold))
+                    .foregroundColor(model.soloRouteId == route.routeId ? Theme.amberWarn : Theme.textSecondary)
+            }
+            .help(model.soloRouteId == route.routeId
+                  ? model.t("退出独奏并恢复先前路由状态", "Exit solo and restore previous route states")
+                  : model.t("仅监听当前路由", "Solo this route"))
+
+            Button(action: { model.removeRoute(id: route.routeId) }) {
+                Image(systemName: "trash")
+                    .foregroundColor(Theme.alertRed)
+            }
+            .disabled(model.soloRouteId != nil)
+            .help(model.t("删除该条路由连接", "Delete this routing connection"))
+        }
+        .font(.system(size: 12))
+        .buttonStyle(.plain)
+    }
+
+    // 打开已有路由的编辑或复制面板
+    private func openRouteSheet(_ route: VbanRouteDesc, mode: RouteSheetMode) {
+        guard let record = model.routeRecord(id: route.routeId) else { return }
+        model.clearRouteSolo()
+        routeSheet = RouteSheetSelection(mode: mode, route: record)
     }
 }
 
@@ -768,6 +835,8 @@ struct InfiniteDotGridCanvas: View {
 struct AddRouteSheet: View {
     @ObservedObject var model: AppModel
     @Binding var isPresented: Bool
+    let mode: RouteSheetMode
+    let route: MatrixRoute?
 
     @State private var srcId: String = ""
     @State private var srcName: String = ""
@@ -775,6 +844,20 @@ struct AddRouteSheet: View {
     @State private var dstName: String = ""
     @State private var srcKind: UInt8 = 0
     @State private var dstKind: UInt8 = 0
+
+    // 使用已有路由初始化编辑或复制面板
+    init(model: AppModel, isPresented: Binding<Bool>, mode: RouteSheetMode, route: MatrixRoute? = nil) {
+        self.model = model
+        self._isPresented = isPresented
+        self.mode = mode
+        self.route = route
+        _srcId = State(initialValue: route?.srcId ?? "")
+        _srcName = State(initialValue: route?.srcName ?? "")
+        _srcKind = State(initialValue: route?.srcKind ?? 0)
+        _dstId = State(initialValue: mode == .duplicate ? "" : route?.dstId ?? "")
+        _dstName = State(initialValue: mode == .duplicate ? "" : route?.dstName ?? "")
+        _dstKind = State(initialValue: mode == .duplicate ? 0 : route?.dstKind ?? 0)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -802,7 +885,7 @@ struct AddRouteSheet: View {
                     srcKind = 1
                 }
             }
-            if dstId.isEmpty {
+            if dstId.isEmpty && mode != .duplicate {
                 if let f = model.devices.first(where: { $0.outChannels > 0 }) {
                     dstId = f.uid
                     dstName = f.name
@@ -821,7 +904,7 @@ struct AddRouteSheet: View {
 
     private var sheetHeader: some View {
         HStack {
-            Text(model.t("新建音频路由", "New Audio Route"))
+            Text(sheetTitle)
                 .font(Theme.cnText(14, weight: .bold))
                 .foregroundColor(Theme.textPrimary)
             Spacer()
@@ -879,6 +962,7 @@ struct AddRouteSheet: View {
                 }
             }
             .menuStyle(.borderedButton)
+            .disabled(mode == .duplicate)
         }
     }
 
@@ -937,19 +1021,45 @@ struct AddRouteSheet: View {
 
             Button(action: {
                 guard !srcId.isEmpty, !dstId.isEmpty else { return }
-                if let existing = model.routes.first(where: { $0.dstId == dstId }) {
-                    model.removeRoute(id: existing.routeId)
+                switch mode {
+                case .edit:
+                    guard let route else { return }
+                    model.updateRoute(id: route.id, srcId: srcId, srcName: srcName, srcKind: srcKind,
+                                      dstId: dstId, dstName: dstName, dstKind: dstKind)
+                case .create, .duplicate:
+                    if let existing = model.routes.first(where: { $0.dstId == dstId }) {
+                        model.removeRoute(id: existing.routeId)
+                    }
+                    model.addRoute(srcId: srcId, srcName: srcName, srcKind: srcKind,
+                                   dstId: dstId, dstName: dstName, dstKind: dstKind)
                 }
-                model.addRoute(srcId: srcId, srcName: srcName, srcKind: srcKind, dstId: dstId, dstName: dstName, dstKind: dstKind)
                 isPresented = false
             }) {
-                Text(model.t("创建并连接", "Create & Connect"))
+                Text(actionTitle)
                     .font(Theme.cnText(12.5, weight: .semibold))
             }
             .buttonStyle(.borderedProminent)
             .tint(Theme.neonCyan)
             .keyboardShortcut(.defaultAction)
             .disabled(srcId.isEmpty || dstId.isEmpty)
+        }
+    }
+
+    // 返回面板标题
+    private var sheetTitle: String {
+        switch mode {
+        case .create: return model.t("新建音频路由", "New Audio Route")
+        case .edit: return model.t("编辑音频路由", "Edit Audio Route")
+        case .duplicate: return model.t("复制并分流", "Duplicate Route")
+        }
+    }
+
+    // 返回提交按钮标题
+    private var actionTitle: String {
+        switch mode {
+        case .create: return model.t("创建并连接", "Create & Connect")
+        case .edit: return model.t("保存并重连", "Save & Reconnect")
+        case .duplicate: return model.t("创建分流", "Create Split")
         }
     }
 }
