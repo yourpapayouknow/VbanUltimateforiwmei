@@ -496,7 +496,7 @@ struct SettingsView: View {
                     .foregroundColor(Theme.textPrimary)
 
                 HStack(spacing: 6) {
-                    ParamCapsule(text: "v1.0.0", color: Theme.neonCyan)
+                    ParamCapsule(text: "v1.1.0", color: Theme.neonCyan)
                     ParamCapsule(text: "arm64", color: Theme.textSecondary)
                     ParamCapsule(text: "macOS 13+", color: Theme.textTertiary)
                 }

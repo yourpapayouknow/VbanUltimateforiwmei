@@ -6,7 +6,7 @@ PROJECT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 BUILD_DIR="$PROJECT_DIR/build"
 APP_PATH="$BUILD_DIR/VBANUltimate.app"
 DIST_DIR="$BUILD_DIR/dist"
-VERSION="1.0.0"
+VERSION="1.1.0"
 
 if [ ! -d "$APP_PATH" ]; then
     echo "Error: $APP_PATH does not exist. Please run build_app.zsh first."

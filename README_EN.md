@@ -40,7 +40,7 @@ Help me install this repository: check macOS environment and Xcode command line 
 
 ### Option 1: Download Pre-built Release Disk Image
 
-1. Head to the [Releases](https://github.com/yourpapayouknow/VbanUltimateforiwmei/releases) page and download `VBANUltimate-v1.0.0-macOS-arm64.dmg`.
+1. Head to the [Releases](https://github.com/yourpapayouknow/VbanUltimateforiwmei/releases) page and download the latest macOS arm64 DMG.
 2. Open the disk image and drag `VBANUltimate.app` into your `Applications` folder.
 3. If using Virtual Audio Cables, run the driver installer script once in your terminal:
    ```zsh
