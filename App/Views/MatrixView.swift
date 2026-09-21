@@ -165,8 +165,6 @@ struct MatrixListView: View {
                 .frame(width: 20, alignment: .center)
             Text(model.t("输出目标", "Destination"))
                 .frame(width: 210, alignment: .leading)
-            Text(model.t("路由增益", "Gain"))
-                .frame(width: 140, alignment: .center)
             Text(model.t("静音", "Mute"))
                 .frame(width: 50, alignment: .center)
             Spacer()
@@ -231,21 +229,6 @@ struct MatrixListView: View {
                 .font(Theme.cnText(13.5, weight: .semibold))
                 .foregroundColor(Theme.textPrimary)
                 .frame(width: 210, alignment: .leading)
-
-            HStack(spacing: 6) {
-                Text(String(format: "%+.1f dB", (r.gain - 1.0) * 12.0))
-                    .font(Theme.monoDigit(12.5, weight: .bold))
-                    .foregroundColor(Theme.neonCyan)
-                    .frame(width: 60, alignment: .trailing)
-
-                Slider(value: Binding(
-                    get: { r.gain },
-                    set: { _ in }
-                ), in: 0.0...2.0)
-                .frame(width: 70)
-                .help(model.t("调节通道增益 (-12dB 至 +12dB)", "Adjust route channel gain (-12dB to +12dB)"))
-            }
-            .frame(width: 140, alignment: .center)
 
             Button(action: {
                 model.toggleRoute(id: r.routeId, enabled: !r.enabled)
@@ -748,8 +731,7 @@ struct CrossPointCell: View {
                     srcKind: inSlot.kind,
                     dstId: outSlot.endpointId,
                     dstName: outSlot.name,
-                    dstKind: outSlot.kind,
-                    gain: 1.0
+                    dstKind: outSlot.kind
                 )
             } else {
                 onOpenAddSheet()
@@ -791,7 +773,6 @@ struct AddRouteSheet: View {
     @State private var srcName: String = ""
     @State private var dstId: String = ""
     @State private var dstName: String = ""
-    @State private var gain: Float = 1.0
     @State private var srcKind: UInt8 = 0
     @State private var dstKind: UInt8 = 0
 
@@ -853,7 +834,6 @@ struct AddRouteSheet: View {
 
             destinationPickerRow
 
-            gainSliderRow
         }
     }
 
@@ -947,28 +927,6 @@ struct AddRouteSheet: View {
         }
     }
 
-    private var gainSliderRow: some View {
-        HStack {
-            Text(model.t("通道增益:", "Gain:"))
-                .font(Theme.cnText(12.5, weight: .semibold))
-                .frame(width: 80, alignment: .trailing)
-
-            Slider(value: $gain, in: 0.0...2.0)
-
-            Text(String(format: "%+.1f dB", (gain - 1.0) * 12.0))
-                .font(Theme.monoDigit(12, weight: .bold))
-                .foregroundColor(Theme.neonCyan)
-                .frame(width: 64, alignment: .trailing)
-
-            Button(action: { gain = 1.0 }) {
-                Text("0 dB")
-                    .font(Theme.monoDigit(11, weight: .semibold))
-            }
-            .buttonStyle(.bordered)
-            .help(model.t("重置为 0dB 标准无衰减增益", "Reset to 0dB standard gain"))
-        }
-    }
-
     private var sheetActions: some View {
         HStack {
             Spacer()
@@ -982,7 +940,7 @@ struct AddRouteSheet: View {
                 if let existing = model.routes.first(where: { $0.dstId == dstId }) {
                     model.removeRoute(id: existing.routeId)
                 }
-                model.addRoute(srcId: srcId, srcName: srcName, srcKind: srcKind, dstId: dstId, dstName: dstName, dstKind: dstKind, gain: gain)
+                model.addRoute(srcId: srcId, srcName: srcName, srcKind: srcKind, dstId: dstId, dstName: dstName, dstKind: dstKind)
                 isPresented = false
             }) {
                 Text(model.t("创建并连接", "Create & Connect"))

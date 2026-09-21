@@ -104,6 +104,18 @@ struct MatrixSlot: Identifiable, Equatable, Codable {
     var kind: UInt8
 }
 
+// 矩阵路由持久化记录
+struct MatrixRoute: Codable {
+    var id: String
+    var srcId: String
+    var srcName: String
+    var srcKind: UInt8
+    var dstId: String
+    var dstName: String
+    var dstKind: UInt8
+    var enabled: Bool
+}
+
 // 网络质量预设枚举
 enum VbanNetworkQuality: UInt8, CaseIterable, Identifiable {
     case optimal = 0
@@ -313,6 +325,7 @@ final class AppModel: ObservableObject {
 
     private var timer: Timer?
     private var ratePollTick = false
+    private var storedRoutes: [MatrixRoute] = []
     private let bridge = VbanBridge.shared()
 
     init() {
@@ -329,6 +342,7 @@ final class AppModel: ObservableObject {
             object: nil
         )
         start()
+        loadRoutes()
     }
 
     deinit {
@@ -544,7 +558,9 @@ final class AppModel: ObservableObject {
                 }
             }
             cables = bridge.getCables()
+            bridge.syncRoutes()
             routes = bridge.getRoutes()
+            saveRoutes()
             devices = bridge.getDevices()
         }
     }
@@ -606,6 +622,46 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // 恢复已保存的矩阵路由
+    private func loadRoutes() {
+        guard let data = UserDefaults.standard.data(forKey: "vban_matrix_routes"),
+              let saved = try? JSONDecoder().decode([MatrixRoute].self, from: data) else { return }
+        storedRoutes = saved
+        for route in saved {
+            if bridge.addRoute(withId: route.id, srcKind: route.srcKind, srcId: route.srcId,
+                               srcName: route.srcName, dstKind: route.dstKind, dstId: route.dstId,
+                               dstName: route.dstName, gain: 1.0), !route.enabled {
+                bridge.toggleRoute(withId: route.id, enabled: false)
+            }
+            fillSlot(route.srcId, name: route.srcName, kind: route.srcKind, input: true)
+            fillSlot(route.dstId, name: route.dstName, kind: route.dstKind, input: false)
+        }
+        bridge.syncRoutes()
+        routes = bridge.getRoutes()
+    }
+
+    // 保存当前矩阵路由
+    private func saveRoutes() {
+        let ids = Set(routes.map(\.routeId))
+        storedRoutes.removeAll { !ids.contains($0.id) }
+        if let data = try? JSONEncoder().encode(storedRoutes) {
+            UserDefaults.standard.set(data, forKey: "vban_matrix_routes")
+        }
+    }
+
+    // 将路由端点填入矩阵槽位
+    private func fillSlot(_ endpoint: String, name: String, kind: UInt8, input: Bool) {
+        var slots = input ? inSlots : outSlots
+        guard !slots.contains(where: { $0.endpointId == endpoint }) else { return }
+        let idx = slots.firstIndex(where: { $0.endpointId.isEmpty }) ?? slots.count
+        if idx == slots.count { slots.append(contentsOf: Self.blnkslts(input ? "in" : "out", 1)) }
+        slots[idx].endpointId = endpoint
+        slots[idx].name = name
+        slots[idx].kind = kind
+        slots[idx].typeDesc = kind == 2 ? t("网络流", "VBAN RX") : kind == 1 ? t("虚拟线缆", "Cable") : t("物理设备", "Device")
+        if input { inSlots = slots } else { outSlots = slots }
+    }
+
     // 追加输入行
     func addInSlot() {
         inSlots.append(contentsOf: Self.blnkslts("in", 1))
@@ -628,6 +684,7 @@ final class AppModel: ObservableObject {
         inSlots.remove(at: idx)
         bridge.syncRoutes()
         routes = bridge.getRoutes()
+        saveRoutes()
     }
 
     // 删除输出列并级联清理相关路由
@@ -642,6 +699,7 @@ final class AppModel: ObservableObject {
         outSlots.remove(at: idx)
         bridge.syncRoutes()
         routes = bridge.getRoutes()
+        saveRoutes()
     }
 
     // 填入输入行端点
@@ -660,6 +718,7 @@ final class AppModel: ObservableObject {
         inSlots[idx].kind = kndof(typeDesc)
         bridge.syncRoutes()
         routes = bridge.getRoutes()
+        saveRoutes()
     }
 
     // 填入输出列端点
@@ -678,6 +737,7 @@ final class AppModel: ObservableObject {
         outSlots[idx].kind = kndof(typeDesc)
         bridge.syncRoutes()
         routes = bridge.getRoutes()
+        saveRoutes()
     }
 
     // 依据端点说明判定端点类型
@@ -689,11 +749,16 @@ final class AppModel: ObservableObject {
     }
 
     // 矩阵路由操作
-    func addRoute(srcId: String, srcName: String, srcKind: UInt8, dstId: String, dstName: String, dstKind: UInt8, gain: Float = 1.0) {
+    func addRoute(srcId: String, srcName: String, srcKind: UInt8, dstId: String, dstName: String, dstKind: UInt8) {
         let rId = "r_\(UUID().uuidString.prefix(8))"
-        if bridge.addRoute(withId: rId, srcKind: srcKind, srcId: srcId, srcName: srcName, dstKind: dstKind, dstId: dstId, dstName: dstName, gain: gain) {
+        if bridge.addRoute(withId: rId, srcKind: srcKind, srcId: srcId, srcName: srcName, dstKind: dstKind, dstId: dstId, dstName: dstName, gain: 1.0) {
             bridge.syncRoutes()
             routes = bridge.getRoutes()
+            storedRoutes.append(MatrixRoute(id: rId, srcId: srcId, srcName: srcName, srcKind: srcKind,
+                                            dstId: dstId, dstName: dstName, dstKind: dstKind, enabled: true))
+            fillSlot(srcId, name: srcName, kind: srcKind, input: true)
+            fillSlot(dstId, name: dstName, kind: dstKind, input: false)
+            saveRoutes()
         }
     }
 
@@ -701,6 +766,7 @@ final class AppModel: ObservableObject {
         if bridge.removeRoute(withId: id) {
             bridge.syncRoutes()
             routes = bridge.getRoutes()
+            saveRoutes()
         }
     }
 
@@ -708,5 +774,9 @@ final class AppModel: ObservableObject {
         bridge.toggleRoute(withId: id, enabled: enabled)
         bridge.syncRoutes()
         routes = bridge.getRoutes()
+        if let idx = storedRoutes.firstIndex(where: { $0.id == id }) {
+            storedRoutes[idx].enabled = enabled
+        }
+        saveRoutes()
     }
 }
