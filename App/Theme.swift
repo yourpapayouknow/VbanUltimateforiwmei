@@ -95,6 +95,11 @@ enum Theme {
         light: NSColor(red: 0.05, green: 0.62, blue: 0.35, alpha: 1.0)
     ))
 
+    static let meterBlue = Color(nsColor: .dynamic(
+        dark: NSColor(red: 0.12, green: 0.48, blue: 0.96, alpha: 1.0),
+        light: NSColor(red: 0.08, green: 0.38, blue: 0.82, alpha: 1.0)
+    ))
+
     static let amberWarn = Color(nsColor: .dynamic(
         dark: NSColor(red: 0.96, green: 0.65, blue: 0.12, alpha: 1.0),
         light: NSColor(red: 0.85, green: 0.50, blue: 0.05, alpha: 1.0)

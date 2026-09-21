@@ -93,9 +93,9 @@ struct CablesView: View {
     private var tableHeader: some View {
         HStack(spacing: 12) {
             Text(model.t("设备名称", "Device Name"))
-                .frame(width: 190, alignment: .leading)
+                .frame(width: 150, alignment: .leading)
             Text(model.t("音频电平", "Audio Level"))
-                .frame(width: 340, alignment: .leading)
+                .frame(width: 380, alignment: .leading)
             Text(model.t("配置格式", "Configuration"))
                 .frame(width: 150, alignment: .leading)
             Spacer()
@@ -142,11 +142,11 @@ struct CablesView: View {
                 .font(Theme.cnText(13.5, weight: .bold))
                 .foregroundColor(Theme.textPrimary)
                 .lineLimit(1)
-                .frame(width: 190, alignment: .leading)
+                .frame(width: 150, alignment: .leading)
                 .help(model.t("设备标识: com.iwmei.vbanultimate.audio.\(cbl.cableId)", "Device Identifier: com.iwmei.vbanultimate.audio.\(cbl.cableId)"))
 
             CableLevelMeterView(cableId: cbl.cableId, channels: cbl.channels, model: model)
-                .frame(width: 340, alignment: .leading)
+                .frame(width: 380, alignment: .leading)
 
             HStack(spacing: 4) {
                 ParamCapsule(text: "\(cbl.channels)CH")
@@ -214,6 +214,8 @@ struct CableLevelMeterView: View {
     @State private var peakHolds: [CGFloat] = []
     @State private var peakAges: [Int] = []
     @State private var peakDb: CGFloat = -999.0
+    @State private var peakWindow: CGFloat = 0
+    @State private var peakTick = 0
     @State private var timer: Timer? = nil
 
     // 显示声道数量约束
@@ -244,7 +246,7 @@ struct CableLevelMeterView: View {
                     }
                 }
             }
-            .frame(width: 276)
+            .frame(width: 316)
 
             // 实时分贝数值或无信号指示
             if peakDb <= -90.0 {
@@ -255,11 +257,11 @@ struct CableLevelMeterView: View {
             } else {
                 Text(String(format: "%+.1f dB", peakDb))
                     .font(Theme.monoDigit(11, weight: .bold))
-                    .foregroundColor(peakDb > -3.0 ? Theme.alertRed : (peakDb > -12.0 ? Theme.amberWarn : Theme.meterGreen))
+                    .foregroundColor(peakDb > 0 ? Theme.alertRed : (peakDb > -12.0 ? Theme.amberWarn : (peakDb > -24.0 ? Theme.meterGreen : Theme.meterBlue)))
                     .frame(width: 56, alignment: .trailing)
             }
         }
-        .frame(width: 340, height: 50, alignment: .leading)
+        .frame(width: 380, height: 50, alignment: .leading)
         .help(model.t(
             "横向多声道电平表 · 峰值: \(peakDb <= -90 ? "-∞" : String(format: "%.1f", peakDb)) dBFS",
             "Horizontal multichannel meter · Peak: \(peakDb <= -90 ? "-∞" : String(format: "%.1f", peakDb)) dBFS"
@@ -279,11 +281,11 @@ struct CableLevelMeterView: View {
         HStack(spacing: 4) {
             Color.clear.frame(width: 20)
             GeometryReader { geo in
-                ForEach([60, 48, 36, 24, 12, 6, 0], id: \.self) { value in
-                    Text("\(value)")
+                ForEach([-60, -48, -36, -24, -12, -6, 0, 3], id: \.self) { db in
+                    Text(db == 3 ? "+3" : "\(abs(db))")
                         .font(Theme.monoDigit(7, weight: .medium))
                         .foregroundColor(Theme.textTertiary)
-                        .position(x: geo.size.width * CGFloat(60 - value) / 60, y: 4)
+                        .position(x: geo.size.width * CGFloat(db + 60) / 63, y: 4)
                 }
             }
         }
@@ -302,22 +304,37 @@ struct CableLevelMeterView: View {
                     RoundedRectangle(cornerRadius: 1)
                         .fill(Theme.meterSlotBg)
                         .overlay(RoundedRectangle(cornerRadius: 1).stroke(Theme.meterSlotBorder, lineWidth: 0.8))
-                    ForEach([0, 12, 24, 36, 48, 60], id: \.self) { value in
+                    ForEach([-60, -48, -36, -24, -12, -6, 0, 3], id: \.self) { db in
                         Rectangle()
                             .fill(Theme.centerAxisLine)
                             .frame(width: 0.5)
-                            .offset(x: geo.size.width * CGFloat(value) / 60)
+                            .offset(x: geo.size.width * CGFloat(db + 60) / 63)
                     }
                     let level = idx < channelLevels.count ? channelLevels[idx] : 0
                     if level > 0 {
-                        RoundedRectangle(cornerRadius: 1)
-                            .fill(Theme.meterGreen)
-                            .frame(width: max(1, geo.size.width * level))
+                        LinearGradient(
+                            stops: [
+                                .init(color: Theme.meterBlue, location: 0),
+                                .init(color: Theme.meterBlue, location: 36.0 / 63.0),
+                                .init(color: Theme.meterGreen, location: 36.0 / 63.0),
+                                .init(color: Theme.meterGreen, location: 48.0 / 63.0),
+                                .init(color: Theme.amberWarn, location: 48.0 / 63.0),
+                                .init(color: Theme.amberWarn, location: 60.0 / 63.0),
+                                .init(color: Theme.alertRed, location: 60.0 / 63.0),
+                                .init(color: Theme.alertRed, location: 1)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .frame(width: geo.size.width, height: channelBarHeight)
+                        .mask(alignment: .leading) {
+                            Rectangle().frame(width: max(1, geo.size.width * level))
+                        }
                     }
                     let hold = idx < peakHolds.count ? peakHolds[idx] : 0
                     if hold > 0 {
                         Rectangle()
-                            .fill(Theme.amberWarn)
+                            .fill(hold > 60.0 / 63.0 ? Theme.alertRed : Theme.amberWarn)
                             .frame(width: 2, height: channelBarHeight)
                             .offset(x: min(geo.size.width - 2, geo.size.width * hold))
                     }
@@ -325,12 +342,20 @@ struct CableLevelMeterView: View {
             }
             .frame(height: channelBarHeight)
         }
-        .frame(width: 276, height: channelBarHeight)
+        .frame(width: 316, height: channelBarHeight)
     }
 
     // 获取声道标识
     private func channelLabel(_ idx: Int) -> String {
-        let labels = channels == 1 ? ["M"] : ["L", "R", "C", "LFE", "Ls", "Rs", "Rls", "Rrs"]
+        let labels: [String]
+        switch channels {
+        case 1: labels = ["M"]
+        case 2: labels = ["L", "R"]
+        case 4: labels = ["L", "R", "Ls", "Rs"]
+        case 6: labels = ["L", "R", "C", "LFE", "Ls", "Rs"]
+        case 8: labels = ["L", "R", "C", "LFE", "Ls", "Rs", "Rls", "Rrs"]
+        default: labels = (1...displayChannelCount).map(String.init)
+        }
         return idx < labels.count ? labels[idx] : "\(idx + 1)"
     }
 
@@ -352,6 +377,8 @@ struct CableLevelMeterView: View {
         channelLevels = Array(repeating: 0.0, count: displayChannelCount)
         peakHolds = channelLevels
         peakAges = Array(repeating: 0, count: displayChannelCount)
+        peakWindow = 0
+        peakTick = 0
     }
 
     // 50Hz多声道真实信号采样计算
@@ -364,8 +391,8 @@ struct CableLevelMeterView: View {
             let old = i < channelLevels.count ? channelLevels[i] : 0.0
             let peak = i < peaks.count ? CGFloat(peaks[i]) : 0.0
             rawPeak = max(rawPeak, peak)
-            let db = peak > 0 ? max(-60.0, min(0.0, 20.0 * log10(peak))) : -60.0
-            let target = (db + 60.0) / 60.0
+            let db = peak > 0 ? max(-60.0, min(3.0, 20.0 * log10(peak))) : -60.0
+            let target = (db + 60.0) / 63.0
             let next = old + (target > old ? 0.45 : 0.08) * (target - old)
             updated.append(next < 0.003 ? 0.0 : next)
             if target >= peakHolds[i] {
@@ -378,7 +405,13 @@ struct CableLevelMeterView: View {
         }
 
         channelLevels = updated
-        peakDb = rawPeak > 0 ? max(-90.0, min(0.0, 20.0 * log10(rawPeak))) : -999.0
+        peakWindow = max(peakWindow, rawPeak)
+        peakTick += 1
+        if peakTick >= 50 {
+            peakDb = peakWindow > 0 ? max(-90.0, min(3.0, 20.0 * log10(peakWindow))) : -999.0
+            peakWindow = 0
+            peakTick = 0
+        }
     }
 }
 
