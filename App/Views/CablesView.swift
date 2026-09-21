@@ -204,22 +204,15 @@ struct CablesView: View {
     }
 }
 
-// 声道配对模型
-struct MeterChannelPair: Identifiable {
-    var id: String { "\(leftIdx ?? -1)_\(rightIdx ?? -1)" }
-    let leftIdx: Int?
-    let leftLabel: String
-    let rightIdx: Int?
-    let rightLabel: String
-}
-
-// 50Hz双列声场横向音频电平表组件
+// 50Hz横向音频电平表组件
 struct CableLevelMeterView: View {
     let cableId: String
     let channels: UInt32
     @ObservedObject var model: AppModel
 
     @State private var channelLevels: [CGFloat] = []
+    @State private var peakHolds: [CGFloat] = []
+    @State private var peakAges: [Int] = []
     @State private var peakDb: CGFloat = -999.0
     @State private var timer: Timer? = nil
 
@@ -228,103 +221,30 @@ struct CableLevelMeterView: View {
         min(8, max(1, Int(channels)))
     }
 
-    // 声场对阵配对生成
-    private var channelPairs: [MeterChannelPair] {
-        switch channels {
-        case 1:
-            return [MeterChannelPair(leftIdx: 0, leftLabel: "M", rightIdx: nil, rightLabel: "")]
-        case 2:
-            return [MeterChannelPair(leftIdx: 0, leftLabel: "L", rightIdx: 1, rightLabel: "R")]
-        case 4:
-            return [
-                MeterChannelPair(leftIdx: 0, leftLabel: "L", rightIdx: 1, rightLabel: "R"),
-                MeterChannelPair(leftIdx: 2, leftLabel: "Ls", rightIdx: 3, rightLabel: "Rs")
-            ]
-        case 6:
-            return [
-                MeterChannelPair(leftIdx: 0, leftLabel: "L", rightIdx: 1, rightLabel: "R"),
-                MeterChannelPair(leftIdx: 2, leftLabel: "C", rightIdx: 3, rightLabel: "LFE"),
-                MeterChannelPair(leftIdx: 4, leftLabel: "Ls", rightIdx: 5, rightLabel: "Rs")
-            ]
-        case 8:
-            return [
-                MeterChannelPair(leftIdx: 0, leftLabel: "L", rightIdx: 1, rightLabel: "R"),
-                MeterChannelPair(leftIdx: 2, leftLabel: "C", rightIdx: 3, rightLabel: "LFE"),
-                MeterChannelPair(leftIdx: 4, leftLabel: "Ls", rightIdx: 5, rightLabel: "Rs"),
-                MeterChannelPair(leftIdx: 6, leftLabel: "Rls", rightIdx: 7, rightLabel: "Rrs")
-            ]
-        default:
-            var pairs: [MeterChannelPair] = []
-            let count = Int(channels)
-            for i in stride(from: 0, to: count, by: 2) {
-                let rIdx = (i + 1 < count) ? (i + 1) : nil
-                pairs.append(MeterChannelPair(
-                    leftIdx: i,
-                    leftLabel: "\(i + 1)",
-                    rightIdx: rIdx,
-                    rightLabel: rIdx != nil ? "\(rIdx! + 1)" : ""
-                ))
-            }
-            return pairs
-        }
-    }
-
     // 单条高度
     private var channelBarHeight: CGFloat {
-        let pairCount = channelPairs.count
-        if pairCount <= 1 { return 7.0 }
-        if pairCount == 2 { return 6.0 }
-        if pairCount == 3 { return 5.5 }
-        return 4.8
+        if displayChannelCount <= 2 { return 7.0 }
+        if displayChannelCount <= 4 { return 5.0 }
+        if displayChannelCount <= 6 { return 3.5 }
+        return 2.75
     }
 
     // 行间距
     private var channelSpacing: CGFloat {
-        let pairCount = channelPairs.count
-        if pairCount <= 1 { return 0.0 }
-        if pairCount == 2 { return 5.0 }
-        if pairCount == 3 { return 3.5 }
-        return 2.5
-    }
-
-    // 电平槽总高度
-    private var totalMeterHeight: CGFloat {
-        let count = CGFloat(channelPairs.count)
-        return count * channelBarHeight + max(0, count - 1) * channelSpacing
+        displayChannelCount <= 2 ? 2.0 : 1.5
     }
 
     var body: some View {
         HStack(spacing: 8) {
-            // 双列声场对阵横条阵列
-            if channels == 1 {
-                singleChannelItem(idx: 0, label: "M", customWidth: 276, labelWidth: 18)
-                    .frame(width: 276, height: channelBarHeight)
-            } else {
-                HStack(spacing: 0) {
-                    // 左声道列
-                    VStack(spacing: channelSpacing) {
-                        ForEach(channelPairs) { pair in
-                            singleChannelItem(idx: pair.leftIdx, label: pair.leftLabel, customWidth: 132, labelWidth: 20)
-                        }
+            VStack(spacing: 2) {
+                meterScale
+                VStack(spacing: channelSpacing) {
+                    ForEach(0..<displayChannelCount, id: \.self) { idx in
+                        channelMeter(idx)
                     }
-                    .frame(width: 132)
-
-                    // 声场中轴分隔线
-                    Rectangle()
-                        .fill(Theme.centerAxisLine)
-                        .frame(width: 1, height: totalMeterHeight)
-                        .padding(.horizontal, 5.5)
-
-                    // 右声道列
-                    VStack(spacing: channelSpacing) {
-                        ForEach(channelPairs) { pair in
-                            singleChannelItem(idx: pair.rightIdx, label: pair.rightLabel, customWidth: 132, labelWidth: 20)
-                        }
-                    }
-                    .frame(width: 132)
                 }
-                .frame(width: 276)
             }
+            .frame(width: 276)
 
             // 实时分贝数值或无信号指示
             if peakDb <= -90.0 {
@@ -341,8 +261,8 @@ struct CableLevelMeterView: View {
         }
         .frame(width: 340, height: 50, alignment: .leading)
         .help(model.t(
-            "双列声场横向电平表 · 峰值: \(peakDb <= -90 ? "-∞" : String(format: "%.1f", peakDb)) dBFS",
-            "Dual-Column Level Meter · Peak: \(peakDb <= -90 ? "-∞" : String(format: "%.1f", peakDb)) dBFS"
+            "横向多声道电平表 · 峰值: \(peakDb <= -90 ? "-∞" : String(format: "%.1f", peakDb)) dBFS",
+            "Horizontal multichannel meter · Peak: \(peakDb <= -90 ? "-∞" : String(format: "%.1f", peakDb)) dBFS"
         ))
         .onAppear {
             initLevels()
@@ -354,50 +274,64 @@ struct CableLevelMeterView: View {
         }
     }
 
-    // 单声道微条单元
-    private func singleChannelItem(idx: Int?, label: String, customWidth: CGFloat, labelWidth: CGFloat) -> some View {
+    // 绘制横向分贝刻度
+    private var meterScale: some View {
         HStack(spacing: 4) {
-            if let idx = idx {
-                Text(label)
-                    .font(Theme.monoDigit(label.count >= 3 ? 7.5 : 8.5, weight: .bold))
-                    .foregroundColor(Theme.textTertiary)
-                    .frame(width: labelWidth, height: channelBarHeight, alignment: .trailing)
-                    .lineLimit(1)
-
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 1.5)
-                            .fill(Theme.meterSlotBg)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 1.5)
-                                    .stroke(Theme.meterSlotBorder, lineWidth: 0.8)
-                            )
-
-                        let lvl = idx < channelLevels.count ? channelLevels[idx] : 0.0
-                        if lvl > 0.001 {
-                            RoundedRectangle(cornerRadius: 1.5)
-                                .fill(
-                                    LinearGradient(
-                                        stops: [
-                                            .init(color: Theme.meterGreen, location: 0.0),
-                                            .init(color: Theme.meterGreen, location: 0.70),
-                                            .init(color: Theme.amberWarn, location: 0.88),
-                                            .init(color: Theme.alertRed, location: 1.0)
-                                        ],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .frame(width: max(2.0, geo.size.width * min(1.0, lvl)))
-                        }
-                    }
+            Color.clear.frame(width: 20)
+            GeometryReader { geo in
+                ForEach([60, 48, 36, 24, 12, 6, 0], id: \.self) { value in
+                    Text("\(value)")
+                        .font(Theme.monoDigit(7, weight: .medium))
+                        .foregroundColor(Theme.textTertiary)
+                        .position(x: geo.size.width * CGFloat(60 - value) / 60, y: 4)
                 }
-                .frame(height: channelBarHeight)
-            } else {
-                Spacer().frame(height: channelBarHeight)
             }
         }
-        .frame(width: customWidth, height: channelBarHeight)
+        .frame(height: 8)
+    }
+
+    // 绘制单声道Logic样式电平条
+    private func channelMeter(_ idx: Int) -> some View {
+        HStack(spacing: 4) {
+            Text(channelLabel(idx))
+                .font(Theme.monoDigit(7.5, weight: .bold))
+                .foregroundColor(Theme.textTertiary)
+                .frame(width: 20, height: channelBarHeight, alignment: .trailing)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(Theme.meterSlotBg)
+                        .overlay(RoundedRectangle(cornerRadius: 1).stroke(Theme.meterSlotBorder, lineWidth: 0.8))
+                    ForEach([0, 12, 24, 36, 48, 60], id: \.self) { value in
+                        Rectangle()
+                            .fill(Theme.centerAxisLine)
+                            .frame(width: 0.5)
+                            .offset(x: geo.size.width * CGFloat(value) / 60)
+                    }
+                    let level = idx < channelLevels.count ? channelLevels[idx] : 0
+                    if level > 0 {
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Theme.meterGreen)
+                            .frame(width: max(1, geo.size.width * level))
+                    }
+                    let hold = idx < peakHolds.count ? peakHolds[idx] : 0
+                    if hold > 0 {
+                        Rectangle()
+                            .fill(Theme.amberWarn)
+                            .frame(width: 2, height: channelBarHeight)
+                            .offset(x: min(geo.size.width - 2, geo.size.width * hold))
+                    }
+                }
+            }
+            .frame(height: channelBarHeight)
+        }
+        .frame(width: 276, height: channelBarHeight)
+    }
+
+    // 获取声道标识
+    private func channelLabel(_ idx: Int) -> String {
+        let labels = channels == 1 ? ["M"] : ["L", "R", "C", "LFE", "Ls", "Rs", "Rls", "Rrs"]
+        return idx < labels.count ? labels[idx] : "\(idx + 1)"
     }
 
     // 启动50Hz采样调度
@@ -416,6 +350,8 @@ struct CableLevelMeterView: View {
     // 初始化电平数组
     private func initLevels() {
         channelLevels = Array(repeating: 0.0, count: displayChannelCount)
+        peakHolds = channelLevels
+        peakAges = Array(repeating: 0, count: displayChannelCount)
     }
 
     // 50Hz多声道真实信号采样计算
@@ -428,9 +364,17 @@ struct CableLevelMeterView: View {
             let old = i < channelLevels.count ? channelLevels[i] : 0.0
             let peak = i < peaks.count ? CGFloat(peaks[i]) : 0.0
             rawPeak = max(rawPeak, peak)
-            let target = min(1.0, peak)
+            let db = peak > 0 ? max(-60.0, min(0.0, 20.0 * log10(peak))) : -60.0
+            let target = (db + 60.0) / 60.0
             let next = old + (target > old ? 0.45 : 0.08) * (target - old)
-            updated.append(next < 0.005 ? 0.0 : next)
+            updated.append(next < 0.003 ? 0.0 : next)
+            if target >= peakHolds[i] {
+                peakHolds[i] = target
+                peakAges[i] = 0
+            } else {
+                peakAges[i] += 1
+                if peakAges[i] > 35 { peakHolds[i] = max(target, peakHolds[i] - 0.012) }
+            }
         }
 
         channelLevels = updated
