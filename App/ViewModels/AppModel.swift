@@ -312,6 +312,7 @@ final class AppModel: ObservableObject {
     }
 
     private var timer: Timer?
+    private var ratePollTick = false
     private let bridge = VbanBridge.shared()
 
     init() {
@@ -384,6 +385,9 @@ final class AppModel: ObservableObject {
 
     func pollMetrics() {
         metrics = bridge.getSnapshot()
+        // 更新音频设备当前采样率
+        ratePollTick.toggle()
+        if ratePollTick { devices = bridge.getDevices() }
         // 同步发送流实时监控指标
         let snaps = metrics.txStreams
         let map = Dictionary(snaps.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
@@ -400,6 +404,36 @@ final class AppModel: ObservableObject {
         isPortConflict = metrics.portConflict
         latestPing = bridge.getLatestPingRecord()
         pingRecords = bridge.getPingRecords()
+    }
+
+    // 查询矩阵端点的实际设备采样率
+    private func deviceRate(_ endpoint: String) -> Double? {
+        if let cable = cables.first(where: { $0.cableId == endpoint }) {
+            return devices.first(where: { $0.name == cable.name })?.sampleRate
+        }
+        return devices.first(where: { $0.uid == endpoint })?.sampleRate
+    }
+
+    // 检查已连接路由的采样率
+    func rateWarning(for route: VbanRouteDesc) -> String? {
+        guard route.enabled else { return nil }
+        let sourceRate: Double?
+        if route.srcName.hasPrefix("VBAN [") {
+            sourceRate = metrics.rxStreams.first(where: {
+                $0.name == route.srcId && $0.status == "Active" && $0.packetsPerSec > 0
+            }).map { Double($0.sampleRate) }
+        } else {
+            sourceRate = deviceRate(route.srcId)
+        }
+        let targetRate: Double?
+        if route.dstName.hasPrefix("VBAN [") {
+            targetRate = txStreams.first(where: { $0.name == route.dstId && $0.enabled }).map { Double($0.sampleRate) }
+        } else {
+            targetRate = deviceRate(route.dstId)
+        }
+        guard let sourceRate, let targetRate, sourceRate > 0, targetRate > 0,
+              abs(sourceRate - targetRate) > 1 else { return nil }
+        return "\(route.srcName) \(String(format: "%g", sourceRate / 1000)) kHz → \(route.dstName) \(String(format: "%g", targetRate / 1000)) kHz"
     }
 
     // 发送本机 VBAN Ping 探测

@@ -40,6 +40,10 @@ struct MatrixView: View {
             // 视图切换胶囊
             viewModeCapsule
 
+            if let warning = model.routes.compactMap({ model.rateWarning(for: $0) }).first {
+                rateAlert(warning)
+            }
+
             Spacer()
 
             // 建立路由按钮
@@ -48,6 +52,17 @@ struct MatrixView: View {
         .padding(.horizontal, 16)
         .frame(height: 40)
         .background(Theme.cardBg)
+    }
+
+    // 显示矩阵采样率告警
+    private func rateAlert(_ warning: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+            Text(model.t("采样率不一致", "Sample rate mismatch"))
+                .font(Theme.cnText(11, weight: .semibold))
+        }
+        .foregroundColor(Theme.amberWarn)
+        .help(model.t("\(warning)。检查音频应用项目、聚合设备和目标设备的采样率。", "\(warning). Check the audio project, aggregate device, and destination sample rates."))
     }
 
     // 视图切换胶囊
@@ -191,8 +206,16 @@ struct MatrixListView: View {
 
     private func routeRow(idx: Int, r: VbanRouteDesc) -> some View {
         HStack(spacing: 12) {
-            StatusLed(isActive: r.enabled, activeColor: Theme.neonCyan)
-                .frame(width: 44, alignment: .center)
+            Group {
+                if let warning = model.rateWarning(for: r) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(Theme.amberWarn)
+                        .help(warning)
+                } else {
+                    StatusLed(isActive: r.enabled, activeColor: Theme.neonCyan)
+                }
+            }
+            .frame(width: 44, alignment: .center)
 
             Text(r.srcName)
                 .font(Theme.cnText(13.5, weight: .semibold))
@@ -698,7 +721,10 @@ struct CrossPointCell: View {
 
     private var tooltipText: String {
         let path = "\(inSlot.name) → \(outSlot.name)"
-        if route != nil {
+        if let route {
+            if let warning = model.rateWarning(for: route) {
+                return model.t("\(warning)（采样率不一致）", "\(warning) (sample rate mismatch)")
+            }
             return model.t("\(path) (已连接 · 点击断开)", "\(path) (Connected · Click to disconnect)")
         }
         if inSlot.endpointId.isEmpty || outSlot.endpointId.isEmpty {
