@@ -52,6 +52,7 @@
     std::map<std::string, std::shared_ptr<vban::OffAud>>   rx_aud_;
     std::map<std::string, std::shared_ptr<vban::OffRcvr>>  rx_rcv_;
     std::map<std::string, std::shared_ptr<vban::OffAud>>   tx_aud_;
+    std::map<std::string, std::shared_ptr<vban::OffAud>>   meter_aud_;
     std::mutex                                             rx_mtx_;
     std::mutex                                             tx_mtx_;
     std::shared_ptr<vban::TxMgr>      tx_mgr_;
@@ -367,7 +368,6 @@
         rd.srcName = [NSString stringWithUTF8String:r.src.name.c_str()];
         rd.dstId   = [NSString stringWithUTF8String:r.dst.id.c_str()];
         rd.dstName = [NSString stringWithUTF8String:r.dst.name.c_str()];
-        rd.gain    = r.gain;
         rd.muted   = r.mut;
         rd.enabled = r.en;
         [arr addObject:rd];
@@ -375,11 +375,11 @@
     return arr;
 }
 
-- (BOOL)addRouteWithId:(NSString *)rId srcKind:(uint8_t)sKind srcId:(NSString *)sId srcName:(NSString *)sName dstKind:(uint8_t)dKind dstId:(NSString *)dId dstName:(NSString *)dName gain:(float)gain {
+- (BOOL)addRouteWithId:(NSString *)rId srcKind:(uint8_t)sKind srcId:(NSString *)sId srcName:(NSString *)sName dstKind:(uint8_t)dKind dstId:(NSString *)dId dstName:(NSString *)dName {
     // 添加或更新矩阵规则并保留端点类型
     vban::Endpnt src{static_cast<vban::EndpntTyp>(sKind), [sId UTF8String], [sName UTF8String]};
     vban::Endpnt dst{static_cast<vban::EndpntTyp>(dKind), [dId UTF8String], [dName UTF8String]};
-    return rtr_->addrout([rId UTF8String], src, dst, gain);
+    return rtr_->addrout([rId UTF8String], src, dst);
 }
 
 - (BOOL)removeRouteWithId:(NSString *)rId {
@@ -443,6 +443,42 @@
 
     [self hndlrx:rxDev];
     [self hndltx:txDev];
+}
+
+// 启动线缆输入端采样
+- (BOOL)startCableMeter:(NSString *)cableId {
+    const std::string key = [cableId UTF8String];
+    if (meter_aud_.count(key)) return YES;
+    VbanAudioDevDesc *dev = [self devByEndpoint:cableId];
+    if (!dev || dev.inChannels == 0 || dev.sampleRate <= 0) return NO;
+    auto aud = std::make_shared<vban::OffAud>();
+    aud->init(vban::AudDir::In, dev.devId);
+    vban::StrmCfg cfg{dev.inChannels, static_cast<uint32_t>(std::llround(dev.sampleRate)), 4};
+    if (!aud->setcfg(cfg)) return NO;
+    meter_aud_[key] = std::move(aud);
+    return YES;
+}
+
+// 读取线缆各声道真实峰值
+- (NSArray<NSNumber *> *)readCablePeaks:(NSString *)cableId {
+    auto it = meter_aud_.find([cableId UTF8String]);
+    if (it == meter_aud_.end()) return @[];
+    const uint32_t ch = it->second->gtcfg().ch;
+    std::vector<float> samples(8192 * ch);
+    const ssize_t bytes = it->second->read(reinterpret_cast<uint8_t*>(samples.data()),
+                                           samples.size() * sizeof(float));
+    std::vector<float> peaks(ch, 0.0f);
+    for (size_t i = 0; i < static_cast<size_t>(std::max<ssize_t>(0, bytes)) / sizeof(float); ++i) {
+        peaks[i % ch] = std::max(peaks[i % ch], std::abs(samples[i]));
+    }
+    NSMutableArray<NSNumber *> *result = [NSMutableArray arrayWithCapacity:ch];
+    for (float peak : peaks) [result addObject:@(peak)];
+    return result;
+}
+
+// 停止线缆输入端采样
+- (void)stopCableMeter:(NSString *)cableId {
+    meter_aud_.erase([cableId UTF8String]);
 }
 
 // 应用接收流回放设备绑定

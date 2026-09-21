@@ -25,7 +25,6 @@ struct RoutRule {
     std::string id;
     Endpnt      src;
     Endpnt      dst;
-    float       gain{1.0f};
     bool        mut{false};
     bool        en{true};
 };
@@ -36,7 +35,7 @@ public:
     MtrxRtr() = default;
 
     // 添加或更新路由规则
-    bool addrout(const std::string& rid, const Endpnt& src, const Endpnt& dst, float gain = 1.0f) {
+    bool addrout(const std::string& rid, const Endpnt& src, const Endpnt& dst) {
         // 创建新的源至目标映射规则
         if (rid.empty() || src.id.empty() || dst.id.empty()) {
             return false;
@@ -47,12 +46,11 @@ public:
             if (r.id == rid) {
                 r.src  = src;
                 r.dst  = dst;
-                r.gain = gain;
                 return true;
             }
         }
 
-        rts_.push_back({rid, src, dst, gain, false, true});
+        rts_.push_back({rid, src, dst, false, true});
         return true;
     }
 
@@ -82,18 +80,6 @@ public:
         }
     }
 
-    // 设置增益大小 (0.0 ~ 2.0)
-    void stgain(const std::string& rid, float gain) {
-        // 调整路由增益倍率
-        std::lock_guard<std::mutex> lock(mtx_);
-        for (auto& r : rts_) {
-            if (r.id == rid) {
-                r.gain = std::clamp(gain, 0.0f, 2.0f);
-                break;
-            }
-        }
-    }
-
     // 获取全部路由规则列表
     std::vector<RoutRule> gtrouts() const {
         // 返回全部路由规则副本
@@ -102,13 +88,13 @@ public:
     }
 
     // 针对指定源查找所有激活的目的地端点
-    std::vector<std::pair<Endpnt, float>> fnddsts(const std::string& src_id) const {
-        // 检索该源分发的目标与有效增益
-        std::vector<std::pair<Endpnt, float>> res;
+    std::vector<Endpnt> fnddsts(const std::string& src_id) const {
+        // 检索该源分发的目标端点
+        std::vector<Endpnt> res;
         std::lock_guard<std::mutex> lock(mtx_);
         for (const auto& r : rts_) {
             if (r.en && !r.mut && r.src.id == src_id) {
-                res.emplace_back(r.dst, r.gain);
+                res.push_back(r.dst);
             }
         }
         return res;

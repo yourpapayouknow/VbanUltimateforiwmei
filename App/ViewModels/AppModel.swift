@@ -544,6 +544,21 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // 启动线缆电平采样
+    func startCableMeter(_ id: String) -> Bool {
+        bridge.startCableMeter(id)
+    }
+
+    // 读取线缆声道峰值
+    func readCablePeaks(_ id: String) -> [Float] {
+        bridge.readCablePeaks(id).map { $0.floatValue }
+    }
+
+    // 停止线缆电平采样
+    func stopCableMeter(_ id: String) {
+        bridge.stopCableMeter(id)
+    }
+
     // 级联删除虚拟线缆及其关联路由
     func removeCable(id: String) {
         let oldCable = cables.first(where: { $0.cableId == id })
@@ -630,7 +645,7 @@ final class AppModel: ObservableObject {
         for route in saved {
             if bridge.addRoute(withId: route.id, srcKind: route.srcKind, srcId: route.srcId,
                                srcName: route.srcName, dstKind: route.dstKind, dstId: route.dstId,
-                               dstName: route.dstName, gain: 1.0), !route.enabled {
+                               dstName: route.dstName), !route.enabled {
                 bridge.toggleRoute(withId: route.id, enabled: false)
             }
             fillSlot(route.srcId, name: route.srcName, kind: route.srcKind, input: true)
@@ -751,7 +766,7 @@ final class AppModel: ObservableObject {
     // 矩阵路由操作
     func addRoute(srcId: String, srcName: String, srcKind: UInt8, dstId: String, dstName: String, dstKind: UInt8) {
         let rId = "r_\(UUID().uuidString.prefix(8))"
-        if bridge.addRoute(withId: rId, srcKind: srcKind, srcId: srcId, srcName: srcName, dstKind: dstKind, dstId: dstId, dstName: dstName, gain: 1.0) {
+        if bridge.addRoute(withId: rId, srcKind: srcKind, srcId: srcId, srcName: srcName, dstKind: dstKind, dstId: dstId, dstName: dstName) {
             bridge.syncRoutes()
             routes = bridge.getRoutes()
             storedRoutes.append(MatrixRoute(id: rId, srcId: srcId, srcName: srcName, srcKind: srcKind,

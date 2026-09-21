@@ -76,7 +76,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSString *srcName;
 @property (nonatomic, copy) NSString *dstId;
 @property (nonatomic, copy) NSString *dstName;
-@property (nonatomic, assign) float gain;
 @property (nonatomic, assign) BOOL muted;
 @property (nonatomic, assign) BOOL enabled;
 @end
@@ -137,7 +136,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 // 矩阵路由管理
 - (NSArray<VbanRouteDesc *> *)getRoutes;
-- (BOOL)addRouteWithId:(NSString *)rId srcKind:(uint8_t)sKind srcId:(NSString *)sId srcName:(NSString *)sName dstKind:(uint8_t)dKind dstId:(NSString *)dId dstName:(NSString *)dName gain:(float)gain;
+- (BOOL)addRouteWithId:(NSString *)rId srcKind:(uint8_t)sKind srcId:(NSString *)sId srcName:(NSString *)sName dstKind:(uint8_t)dKind dstId:(NSString *)dId dstName:(NSString *)dName;
 - (BOOL)removeRouteWithId:(NSString *)rId;
 - (void)toggleRouteWithId:(NSString *)rId enabled:(BOOL)en;
 
@@ -149,6 +148,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 // 流设备指派：依据矩阵规则同步流与设备的音频通路
 - (void)syncRoutes;
+
+// 虚拟线缆实际音频电平
+- (BOOL)startCableMeter:(NSString *)cableId;
+- (NSArray<NSNumber *> *)readCablePeaks:(NSString *)cableId;
+- (void)stopCableMeter:(NSString *)cableId;
 
 // 全局指标快照 (500ms 轮询)
 - (VbanAppMetric *)getSnapshot;

@@ -145,7 +145,7 @@ struct CablesView: View {
                 .frame(width: 190, alignment: .leading)
                 .help(model.t("设备标识: com.iwmei.vbanultimate.audio.\(cbl.cableId)", "Device Identifier: com.iwmei.vbanultimate.audio.\(cbl.cableId)"))
 
-            CableLevelMeterView(cableId: cbl.cableId, channels: cbl.channels, cableName: cbl.name, model: model)
+            CableLevelMeterView(cableId: cbl.cableId, channels: cbl.channels, model: model)
                 .frame(width: 340, alignment: .leading)
 
             HStack(spacing: 4) {
@@ -217,7 +217,6 @@ struct MeterChannelPair: Identifiable {
 struct CableLevelMeterView: View {
     let cableId: String
     let channels: UInt32
-    let cableName: String
     @ObservedObject var model: AppModel
 
     @State private var channelLevels: [CGFloat] = []
@@ -347,10 +346,11 @@ struct CableLevelMeterView: View {
         ))
         .onAppear {
             initLevels()
-            startSampling()
+            if model.startCableMeter(cableId) { startSampling() }
         }
         .onDisappear {
             stopSampling()
+            model.stopCableMeter(cableId)
         }
     }
 
@@ -420,50 +420,21 @@ struct CableLevelMeterView: View {
 
     // 50Hz多声道真实信号采样计算
     private func updateLevels() {
-        let activeIncomingRoute = model.routes.first(where: {
-            $0.dstName == cableName && $0.enabled && !$0.muted
-        })
-
-        var targetEnergy: CGFloat = 0.0
-        if let r = activeIncomingRoute {
-            if let rx = model.metrics.rxStreams.first(where: {
-                $0.name == r.srcName && $0.status == "Active" && $0.kbps > 0 && $0.packetsPerSec > 0
-            }) {
-                let maxThroughput: CGFloat = CGFloat(rx.sampleRate * rx.channels * rx.bitDepth) / 1000.0
-                let ratio = maxThroughput > 0 ? CGFloat(rx.kbps) / maxThroughput : 0.0
-                targetEnergy = max(0.0, min(1.0, ratio * CGFloat(r.gain) * 0.75))
-            }
-        }
-
+        let peaks = model.readCablePeaks(cableId)
         let count = displayChannelCount
         var updated: [CGFloat] = []
-        var maxLvl: CGFloat = 0.0
-
+        var rawPeak: CGFloat = 0.0
         for i in 0..<count {
             let old = i < channelLevels.count ? channelLevels[i] : 0.0
-            if targetEnergy <= 0.0001 {
-                let next = old * 0.7
-                let finalLvl = next < 0.005 ? 0.0 : next
-                updated.append(finalLvl)
-                if finalLvl > maxLvl { maxLvl = finalLvl }
-            } else {
-                let chFactor: CGFloat = (count == 2 && i == 1) ? 0.94 : 1.0
-                let target = min(1.0, targetEnergy * chFactor)
-                let alpha: CGFloat = target > old ? 0.45 : 0.08
-                let next = old + alpha * (target - old)
-                updated.append(next)
-                if next > maxLvl { maxLvl = next }
-            }
+            let peak = i < peaks.count ? CGFloat(peaks[i]) : 0.0
+            rawPeak = max(rawPeak, peak)
+            let target = min(1.0, peak)
+            let next = old + (target > old ? 0.45 : 0.08) * (target - old)
+            updated.append(next < 0.005 ? 0.0 : next)
         }
 
         channelLevels = updated
-
-        if maxLvl <= 0.001 {
-            peakDb = -999.0
-        } else {
-            let db = 20.0 * log10(maxLvl)
-            peakDb = max(-48.0, min(0.0, db))
-        }
+        peakDb = rawPeak > 0 ? max(-90.0, min(0.0, 20.0 * log10(rawPeak))) : -999.0
     }
 }
 
